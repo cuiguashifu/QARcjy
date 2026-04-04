@@ -1,6 +1,8 @@
 package com.qar.securitysystem.config;
 
 import com.qar.securitysystem.security.SessionAuthFilter;
+import com.qar.securitysystem.security.AuditLogFilter;
+import com.qar.securitysystem.service.AuditLogService;
 import com.qar.securitysystem.service.SessionService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -26,7 +28,12 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, SessionAuthFilter sessionAuthFilter) throws Exception {
+    public AuditLogFilter auditLogFilter(AuditLogService auditLogService) {
+        return new AuditLogFilter(auditLogService);
+    }
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, SessionAuthFilter sessionAuthFilter, AuditLogFilter auditLogFilter) throws Exception {
         CookieCsrfTokenRepository csrfRepo = CookieCsrfTokenRepository.withHttpOnlyFalse();
         csrfRepo.setCookiePath("/");
 
@@ -34,6 +41,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(csrfRepo)
                         .ignoringRequestMatchers("/h2/**")
+                        .ignoringRequestMatchers("/api/auth/**")
                 )
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
@@ -45,11 +53,13 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/assets/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/csrf").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/files").hasRole("ADMIN")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll()
                 )
                 .addFilterBefore(sessionAuthFilter, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(auditLogFilter, SessionAuthFilter.class)
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(authenticationEntryPoint())
                         .accessDeniedHandler(accessDeniedHandler())

@@ -3,6 +3,7 @@ package com.qar.securitysystem.dto;
 public class FileRecordResponse {
     private String id;
     private String ownerId;
+    private String ownerLabel;
     private String originalName;
     private String contentType;
     private long sizeBytes;
@@ -24,6 +25,14 @@ public class FileRecordResponse {
 
     public void setOwnerId(String ownerId) {
         this.ownerId = ownerId;
+    }
+
+    public String getOwnerLabel() {
+        return ownerLabel;
+    }
+
+    public void setOwnerLabel(String ownerLabel) {
+        this.ownerLabel = ownerLabel;
     }
 
     public String getOriginalName() {
@@ -74,4 +83,3 @@ public class FileRecordResponse {
         this.createdAt = createdAt;
     }
 }
-

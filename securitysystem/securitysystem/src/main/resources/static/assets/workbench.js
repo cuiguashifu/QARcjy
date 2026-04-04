@@ -6,8 +6,23 @@ async function ensureMe() {
     return null
   }
   document.getElementById("me-pill").textContent = me.emailOrUsername + " · " + me.role
+  const pfName = document.getElementById("pf-name")
+  const pfNo = document.getElementById("pf-no")
+  const pfAirline = document.getElementById("pf-airline")
+  const pfPos = document.getElementById("pf-position")
+  const pfDept = document.getElementById("pf-dept")
+  if (pfName) pfName.value = me.fullName || "-"
+  if (pfNo) pfNo.value = me.personNo || me.emailOrUsername || "-"
+  if (pfAirline) pfAirline.value = me.airline || "-"
+  if (pfPos) pfPos.value = me.positionTitle || "-"
+  if (pfDept) pfDept.value = me.department || ""
   if (me.role === "admin") {
     document.getElementById("admin-link").style.display = "inline"
+  } else {
+    const uc = document.getElementById("upload-card")
+    if (uc) uc.style.display = "none"
+    const grid = document.getElementById("grid")
+    if (grid) grid.style.gridTemplateColumns = "1fr"
   }
   return me
 }
@@ -50,7 +65,7 @@ async function onUpload() {
     if (policy) fd.append("policy", policy)
     const resp = await apiFetch("/api/files", { method: "POST", body: fd, headers: {} })
     localStorage.setItem("qar_last_upload_id", resp.id)
-    showToast("上传成功", "已加密并写入数据库：" + resp.id, "success")
+    showToast("上传成功", "已保存：" + resp.id, "success")
     out.innerHTML = "记录ID：<b></b> · 策略：<span></span> · <a class='link' href='/feedback?fileId=" + encodeURIComponent(resp.id) + "&subject=" + encodeURIComponent("关于记录 " + resp.id + " 的问题") + "'>就此记录提交反馈</a>"
     out.querySelector("b").textContent = resp.id
     out.querySelector("span").textContent = resp.policy || "-"
@@ -76,10 +91,35 @@ async function onLogout() {
   }
 }
 
+async function onSaveDept() {
+  const btn = document.getElementById("btn-save-dept")
+  const input = document.getElementById("pf-dept")
+  if (!btn || !input) return
+  const dept = (input.value || "").trim()
+  btn.disabled = true
+  try {
+    await apiFetch("/api/profile/department", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ department: dept })
+    })
+    showToast("已保存", "部门信息已更新", "success")
+    const me = await loadMe()
+    if (me && input) input.value = me.department || dept
+  } catch (e) {
+    showToast("保存失败", e.message, "danger")
+  } finally {
+    btn.disabled = false
+  }
+}
+
 async function main() {
   const me = await ensureMe()
   if (!me) return
-  document.getElementById("btn-upload").addEventListener("click", onUpload)
+  if (me.role === "admin") {
+    document.getElementById("btn-upload").addEventListener("click", onUpload)
+  }
+  document.getElementById("btn-save-dept").addEventListener("click", onSaveDept)
   document.getElementById("btn-logout").addEventListener("click", onLogout)
   await refreshList()
 }
