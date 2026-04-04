@@ -5,6 +5,11 @@ public class UserResponse {
     private String emailOrUsername;
     private String role;
     private String createdAt;
+    private String fullName;
+    private String personNo;
+    private String department;
+    private String airline;
+    private String positionTitle;
 
     public String getId() {
         return id;
@@ -37,5 +42,44 @@ public class UserResponse {
     public void setCreatedAt(String createdAt) {
         this.createdAt = createdAt;
     }
-}
 
+    public String getFullName() {
+        return fullName;
+    }
+
+    public void setFullName(String fullName) {
+        this.fullName = fullName;
+    }
+
+    public String getPersonNo() {
+        return personNo;
+    }
+
+    public void setPersonNo(String personNo) {
+        this.personNo = personNo;
+    }
+
+    public String getDepartment() {
+        return department;
+    }
+
+    public void setDepartment(String department) {
+        this.department = department;
+    }
+
+    public String getAirline() {
+        return airline;
+    }
+
+    public void setAirline(String airline) {
+        this.airline = airline;
+    }
+
+    public String getPositionTitle() {
+        return positionTitle;
+    }
+
+    public void setPositionTitle(String positionTitle) {
+        this.positionTitle = positionTitle;
+    }
+}

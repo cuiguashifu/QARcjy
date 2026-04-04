@@ -44,6 +44,11 @@ public class AdminSeeder implements ApplicationRunner {
             return;
         }
 
+        if (existing.getPasswordHash() == null || !passwordEncoder.matches(adminPassword, existing.getPasswordHash())) {
+            existing.setPasswordHash(passwordEncoder.encode(adminPassword));
+            userRepository.save(existing);
+        }
+
         if (existing.getRole() != UserRole.ADMIN) {
             existing.setRole(UserRole.ADMIN);
             userRepository.save(existing);

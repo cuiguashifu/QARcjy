@@ -35,7 +35,7 @@ async function refreshFiles() {
     const tr = document.createElement("tr")
     tr.innerHTML = "<td></td><td></td><td></td><td></td><td></td><td></td><td class='actions'></td>"
     tr.children[0].textContent = r.id
-    tr.children[1].textContent = r.ownerId
+    tr.children[1].textContent = r.ownerLabel || r.ownerId
     tr.children[2].textContent = r.originalName
     tr.children[3].textContent = fmtBytes(r.sizeBytes)
     tr.children[4].textContent = r.policy || "-"
@@ -45,6 +45,85 @@ async function refreshFiles() {
     a.textContent = "下载"
     a.href = "/api/files/" + r.id + "/download"
     tr.children[6].appendChild(a)
+    tbody.appendChild(tr)
+  }
+}
+
+async function refreshRequests() {
+  const rows = await apiFetch("/api/admin/account-requests", { method: "GET" })
+  const tbody = document.querySelector("#requests tbody")
+  tbody.innerHTML = ""
+  for (const r of rows) {
+    const tr = document.createElement("tr")
+    tr.innerHTML = "<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class='actions'></td>"
+    tr.children[0].textContent = r.id
+    tr.children[1].textContent = r.personNo
+    tr.children[2].textContent = r.fullName
+    tr.children[3].textContent = r.airline
+    tr.children[4].textContent = r.positionTitle
+    tr.children[5].textContent = r.department
+    tr.children[6].textContent = r.contact
+    tr.children[7].textContent = (r.createdAt || "").replace("T", " ").replace("Z", "")
+
+    const btnApprove = document.createElement("button")
+    btnApprove.className = "btn primary"
+    btnApprove.textContent = "通过"
+    btnApprove.addEventListener("click", async () => {
+      const note = window.prompt("审批备注（可选）：", "")
+      if (note === null) return
+      try {
+        await apiFetch("/api/admin/account-requests/" + r.id + "/approve", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ adminNote: note })
+        })
+        showToast("已通过", "账号已创建：" + r.personNo, "success")
+        await refreshRequests()
+        await refreshUsers()
+      } catch (e) {
+        showToast("操作失败", e.message, "danger")
+      }
+    })
+
+    const btnReject = document.createElement("button")
+    btnReject.className = "btn"
+    btnReject.textContent = "拒绝"
+    btnReject.addEventListener("click", async () => {
+      const note = window.prompt("拒绝原因（可选）：", "")
+      if (note === null) return
+      try {
+        await apiFetch("/api/admin/account-requests/" + r.id + "/reject", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ adminNote: note })
+        })
+        showToast("已拒绝", r.personNo, "success")
+        await refreshRequests()
+      } catch (e) {
+        showToast("操作失败", e.message, "danger")
+      }
+    })
+
+    tr.children[8].appendChild(btnApprove)
+    tr.children[8].appendChild(btnReject)
+    tbody.appendChild(tr)
+  }
+}
+
+async function refreshLogs() {
+  const rows = await apiFetch("/api/admin/audit-logs", { method: "GET" })
+  const tbody = document.querySelector("#logs tbody")
+  tbody.innerHTML = ""
+  for (const r of rows) {
+    const tr = document.createElement("tr")
+    tr.innerHTML = "<td></td><td></td><td></td><td></td><td></td><td></td><td></td>"
+    tr.children[0].textContent = (r.createdAt || "").replace("T", " ").replace("Z", "")
+    tr.children[1].textContent = r.personNo || "-"
+    tr.children[2].textContent = r.method || "-"
+    tr.children[3].textContent = r.path || "-"
+    tr.children[4].textContent = String(r.statusCode || "")
+    tr.children[5].textContent = (r.durationMs != null ? (r.durationMs + "ms") : "-")
+    tr.children[6].textContent = r.ip || "-"
     tbody.appendChild(tr)
   }
 }
@@ -152,9 +231,13 @@ async function main() {
   document.getElementById("btn-export").addEventListener("click", onExport)
   document.getElementById("btn-logout").addEventListener("click", onLogout)
   document.getElementById("btn-refresh-feedback").addEventListener("click", refreshFeedback)
+  document.getElementById("btn-refresh-requests").addEventListener("click", refreshRequests)
+  document.getElementById("btn-refresh-logs").addEventListener("click", refreshLogs)
   await refreshUsers()
+  await refreshRequests()
   await refreshFiles()
   await refreshFeedback()
+  await refreshLogs()
 }
 
 main()

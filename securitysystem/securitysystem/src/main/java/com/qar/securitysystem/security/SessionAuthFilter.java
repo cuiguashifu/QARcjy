@@ -32,7 +32,7 @@ public class SessionAuthFilter extends OncePerRequestFilter {
             if (raw != null && !raw.isBlank()) {
                 UserEntity user = sessionService.resolveUserFromSessionToken(raw);
                 if (user != null) {
-                    AppPrincipal principal = new AppPrincipal(user.getId(), user.getAccount(), user.getRole());
+                    AppPrincipal principal = new AppPrincipal(user.getId(), user.getAccount(), user.getRole(), user.getPersonId());
                     UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                             principal,
                             null,

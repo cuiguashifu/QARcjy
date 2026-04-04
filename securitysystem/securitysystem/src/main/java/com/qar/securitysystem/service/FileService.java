@@ -61,7 +61,8 @@ public class FileService {
 
         FileRecordEntity r = new FileRecordEntity();
         r.setId(IdUtil.newId());
-        r.setOwnerId(user.getId());
+        String ownerKey = user.getPersonId() == null || user.getPersonId().isBlank() ? user.getId() : user.getPersonId();
+        r.setOwnerId(ownerKey);
         r.setOriginalName(file.getOriginalFilename() == null ? "upload.bin" : file.getOriginalFilename());
         r.setContentType(file.getContentType() == null ? MediaType.APPLICATION_OCTET_STREAM_VALUE : file.getContentType());
         r.setSizeBytes(raw.length);
@@ -74,8 +75,8 @@ public class FileService {
         return toResponse(r);
     }
 
-    public List<FileRecordResponse> listMine(String userId) {
-        return fileRecordRepository.findAllByOwnerIdOrderByCreatedAtDesc(userId).stream().map(this::toResponse).toList();
+    public List<FileRecordResponse> listMine(List<String> ownerIds) {
+        return fileRecordRepository.findAllByOwnerIdInOrderByCreatedAtDesc(ownerIds).stream().map(this::toResponse).toList();
     }
 
     public FileRecordEntity getRecordOrNull(String id) {
@@ -116,4 +117,3 @@ public class FileService {
         return resp;
     }
 }
-

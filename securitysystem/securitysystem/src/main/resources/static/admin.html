@@ -44,6 +44,36 @@
           <div class="card-h">
             <div class="row" style="justify-content:space-between">
               <div>
+                <div class="h2">账号创建申请</div>
+                <div class="muted">普通用户提交申请后由管理员审核；通过后才会创建账号</div>
+              </div>
+              <button class="btn" id="btn-refresh-requests">刷新</button>
+            </div>
+          </div>
+          <div class="card-b">
+            <table class="table" id="requests">
+              <thead>
+                <tr>
+                  <th>申请ID</th>
+                  <th>工号</th>
+                  <th>姓名</th>
+                  <th>航司</th>
+                  <th>职位</th>
+                  <th>部门</th>
+                  <th>联系方式</th>
+                  <th>提交时间</th>
+                  <th class="actions">操作</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <div class="card-h">
+            <div class="row" style="justify-content:space-between">
+              <div>
                 <div class="h2">全量数据管理</div>
                 <div class="muted">查看全部记录并导出全部解密数据（zip）</div>
               </div>
@@ -89,6 +119,34 @@
                   <th>状态</th>
                   <th>更新时间</th>
                   <th class="actions">操作</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <div class="card-h">
+            <div class="row" style="justify-content:space-between">
+              <div>
+                <div class="h2">操作日志</div>
+                <div class="muted">记录普通用户的关键操作（接口调用、下载、资料修改等）</div>
+              </div>
+              <button class="btn" id="btn-refresh-logs">刷新</button>
+            </div>
+          </div>
+          <div class="card-b">
+            <table class="table" id="logs">
+              <thead>
+                <tr>
+                  <th>时间</th>
+                  <th>工号</th>
+                  <th>方法</th>
+                  <th>路径</th>
+                  <th>状态</th>
+                  <th>耗时</th>
+                  <th>IP</th>
                 </tr>
               </thead>
               <tbody></tbody>

@@ -28,8 +28,8 @@
 
           <div id="panel-login" class="col">
             <div class="col">
-              <div class="label">邮箱/用户名</div>
-              <input class="input" id="login-username" autocomplete="username" />
+              <div class="label">学号/工号</div>
+              <input class="input" id="login-username" autocomplete="username" placeholder="例如：20260001" />
             </div>
             <div class="col">
               <div class="label">密码</div>
@@ -40,19 +40,43 @@
 
           <div id="panel-register" class="col" style="display:none">
             <div class="col">
-              <div class="label">邮箱/用户名</div>
-              <input class="input" id="reg-username" autocomplete="username" />
+              <div class="label">学号/工号</div>
+              <input class="input" id="reg-username" autocomplete="username" placeholder="必须与档案库一致" />
             </div>
             <div class="col">
-              <div class="label">密码</div>
+              <div class="label">姓名</div>
+              <input class="input" id="reg-fullname" autocomplete="name" placeholder="必须与档案库一致" />
+            </div>
+            <div class="col">
+              <div class="label">身份证后四位</div>
+              <input class="input" id="reg-idlast4" inputmode="numeric" maxlength="4" placeholder="例如：1234" />
+            </div>
+            <div class="col">
+              <div class="label">联系方式</div>
+              <input class="input" id="reg-contact" inputmode="tel" placeholder="手机号/座机/邮箱" />
+            </div>
+            <div class="col">
+              <div class="label">航司</div>
+              <input class="input" id="reg-airline" placeholder="例如：CAUC" />
+            </div>
+            <div class="col">
+              <div class="label">所属职位</div>
+              <input class="input" id="reg-position" placeholder="例如：机长/副驾驶/签派员" />
+            </div>
+            <div class="col">
+              <div class="label">所属部门</div>
+              <input class="input" id="reg-dept" placeholder="例如：飞行一部" />
+            </div>
+            <div class="col">
+              <div class="label">设置密码</div>
               <input class="input" id="reg-password" type="password" autocomplete="new-password" />
             </div>
             <div class="col">
               <div class="label">确认密码</div>
               <input class="input" id="reg-password2" type="password" autocomplete="new-password" />
             </div>
-            <button class="btn primary" id="btn-register">注册</button>
-            <div class="muted">Admin 为预置唯一账号，无法重复注册</div>
+            <button class="btn primary" id="btn-register">提交申请</button>
+            <div class="muted">提交后需管理员审核通过才会创建账号</div>
           </div>
         </div>
       </div>
@@ -67,4 +91,3 @@
     <script src="/assets/auth.js"></script>
   </body>
 </html>
-

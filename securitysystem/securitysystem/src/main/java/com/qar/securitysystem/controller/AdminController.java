@@ -1,16 +1,21 @@
 package com.qar.securitysystem.controller;
 
 import com.qar.securitysystem.dto.AdminFeedbackUpdateRequest;
+import com.qar.securitysystem.dto.AdminAccountRequestReview;
 import com.qar.securitysystem.model.FileRecordEntity;
+import com.qar.securitysystem.security.AppPrincipal;
 import com.qar.securitysystem.service.AdminService;
 import com.qar.securitysystem.service.FileService;
+import com.qar.securitysystem.util.SecurityUtil;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -53,6 +58,36 @@ public class AdminController {
     @GetMapping("/feedback")
     public ResponseEntity<?> feedback() {
         return ResponseEntity.ok(adminService.listAllFeedback());
+    }
+
+    @GetMapping("/account-requests")
+    public ResponseEntity<?> accountRequests() {
+        return ResponseEntity.ok(adminService.listPendingAccountRequests());
+    }
+
+    @GetMapping("/audit-logs")
+    public ResponseEntity<?> auditLogs() {
+        return ResponseEntity.ok(adminService.listAuditLogs());
+    }
+
+    @PostMapping("/account-requests/{id}/approve")
+    public ResponseEntity<?> approve(Authentication authentication, @PathVariable("id") String id, @RequestBody(required = false) AdminAccountRequestReview req) {
+        try {
+            AppPrincipal p = SecurityUtil.requirePrincipal(authentication);
+            return ResponseEntity.ok(adminService.approveAccountRequest(id, p.getUserId(), req == null ? null : req.getAdminNote()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("code", 400, "message", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/account-requests/{id}/reject")
+    public ResponseEntity<?> reject(Authentication authentication, @PathVariable("id") String id, @RequestBody(required = false) AdminAccountRequestReview req) {
+        try {
+            AppPrincipal p = SecurityUtil.requirePrincipal(authentication);
+            return ResponseEntity.ok(adminService.rejectAccountRequest(id, p.getUserId(), req == null ? null : req.getAdminNote()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("code", 400, "message", e.getMessage()));
+        }
     }
 
     @PatchMapping("/feedback/{id}")

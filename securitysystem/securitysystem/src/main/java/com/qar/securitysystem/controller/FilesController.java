@@ -2,7 +2,9 @@ package com.qar.securitysystem.controller;
 
 import com.qar.securitysystem.dto.FileRecordResponse;
 import com.qar.securitysystem.model.FileRecordEntity;
+import com.qar.securitysystem.model.PersonRecordEntity;
 import com.qar.securitysystem.model.UserEntity;
+import com.qar.securitysystem.repo.PersonRecordRepository;
 import com.qar.securitysystem.repo.UserRepository;
 import com.qar.securitysystem.security.AppPrincipal;
 import com.qar.securitysystem.service.FileService;
@@ -26,24 +28,51 @@ import java.util.List;
 public class FilesController {
     private final FileService fileService;
     private final UserRepository userRepository;
+    private final PersonRecordRepository personRecordRepository;
 
-    public FilesController(FileService fileService, UserRepository userRepository) {
+    public FilesController(FileService fileService, UserRepository userRepository, PersonRecordRepository personRecordRepository) {
         this.fileService = fileService;
         this.userRepository = userRepository;
+        this.personRecordRepository = personRecordRepository;
     }
 
     @PostMapping
-    public ResponseEntity<FileRecordResponse> upload(Authentication authentication, @RequestParam("file") MultipartFile file, @RequestParam(value = "policy", required = false) String policy) {
+    public ResponseEntity<FileRecordResponse> upload(
+            Authentication authentication,
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "policy", required = false) String policy,
+            @RequestParam(value = "personNo", required = false) String personNo
+    ) {
         AppPrincipal p = SecurityUtil.requirePrincipal(authentication);
-        UserEntity u = userRepository.findById(p.getUserId()).orElseThrow();
-        FileRecordResponse resp = fileService.uploadAndEncrypt(u, file, policy);
+        boolean isAdmin = p.getRole().name().equals("ADMIN");
+        if (!isAdmin) {
+            return ResponseEntity.status(403).build();
+        }
+        UserEntity uploader = userRepository.findById(p.getUserId()).orElseThrow();
+        UserEntity target = new UserEntity();
+        target.setId(uploader.getId());
+        if (personNo != null && !personNo.isBlank()) {
+            PersonRecordEntity pr = personRecordRepository.findByPersonNo(personNo.trim()).orElse(null);
+            if (pr == null) {
+                return ResponseEntity.badRequest().build();
+            }
+            target.setPersonId(pr.getId());
+        } else {
+            target.setPersonId(uploader.getPersonId());
+        }
+        FileRecordResponse resp = fileService.uploadAndEncrypt(target, file, policy);
         return ResponseEntity.ok(resp);
     }
 
     @GetMapping
     public ResponseEntity<List<FileRecordResponse>> listMine(Authentication authentication) {
         AppPrincipal p = SecurityUtil.requirePrincipal(authentication);
-        return ResponseEntity.ok(fileService.listMine(p.getUserId()));
+        java.util.List<String> ids = new java.util.ArrayList<>();
+        ids.add(p.getUserId());
+        if (p.getPersonId() != null && !p.getPersonId().isBlank()) {
+            ids.add(p.getPersonId());
+        }
+        return ResponseEntity.ok(fileService.listMine(ids));
     }
 
     @GetMapping("/{id}/download")
@@ -54,7 +83,7 @@ public class FilesController {
             return ResponseEntity.status(404).build();
         }
         boolean isAdmin = p.getRole().name().equals("ADMIN");
-        if (!isAdmin && !r.getOwnerId().equals(p.getUserId())) {
+        if (!isAdmin && !r.getOwnerId().equals(p.getUserId()) && (p.getPersonId() == null || !r.getOwnerId().equals(p.getPersonId()))) {
             return ResponseEntity.status(403).build();
         }
         byte[] raw = fileService.decryptForDownload(r);
@@ -71,4 +100,3 @@ public class FilesController {
         return name.replace("\n", " ").replace("\r", " ");
     }
 }
-
