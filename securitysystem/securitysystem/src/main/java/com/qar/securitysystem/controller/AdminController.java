@@ -3,6 +3,8 @@ package com.qar.securitysystem.controller;
 import com.qar.securitysystem.dto.AdminFeedbackUpdateRequest;
 import com.qar.securitysystem.dto.AdminAccountRequestReview;
 import com.qar.securitysystem.model.FileRecordEntity;
+import com.qar.securitysystem.model.PersonRecordEntity;
+import com.qar.securitysystem.repo.PersonRecordRepository;
 import com.qar.securitysystem.security.AppPrincipal;
 import com.qar.securitysystem.service.AdminService;
 import com.qar.securitysystem.service.FileService;
@@ -29,15 +31,22 @@ import java.util.zip.ZipOutputStream;
 public class AdminController {
     private final AdminService adminService;
     private final FileService fileService;
+    private final PersonRecordRepository personRecordRepository;
 
-    public AdminController(AdminService adminService, FileService fileService) {
+    public AdminController(AdminService adminService, FileService fileService, PersonRecordRepository personRecordRepository) {
         this.adminService = adminService;
         this.fileService = fileService;
+        this.personRecordRepository = personRecordRepository;
     }
 
     @GetMapping("/users")
     public ResponseEntity<?> users() {
         return ResponseEntity.ok(adminService.listUsers());
+    }
+
+    @GetMapping("/persons")
+    public ResponseEntity<?> persons() {
+        return ResponseEntity.ok(personRecordRepository.findAll());
     }
 
     @GetMapping("/files")

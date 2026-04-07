@@ -40,29 +40,36 @@ public class EncryptController {
             System.out.println("[处理] 正在调用 BouncyCastle 引擎...");
             System.out.println("[处理] 正在生成随机 AES-256 密钥及 IV 向量...");
 
-            // 使用固定的测试密钥（实际应用中应该使用安全的密钥管理）
-            byte[] keyBytes = "12345678901234567890123456789012".getBytes(StandardCharsets.UTF_8);
-            SecretKey secretKey = new javax.crypto.spec.SecretKeySpec(keyBytes, "AES");
+            // 1. 生成随机 AES-256 密钥
+            KeyGenerator keyGen = KeyGenerator.getInstance("AES", "BC");
+            keyGen.init(256, new SecureRandom());
+            SecretKey secretKey = keyGen.generateKey();
 
+            // 2. 生成随机 12 字节 IV (GCM 推荐长度)
             byte[] iv = new byte[12];
             new SecureRandom().nextBytes(iv);
             GCMParameterSpec gcmSpec = new GCMParameterSpec(128, iv);
 
+            // 3. 使用 BouncyCastle 进行加密
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding", "BC");
             cipher.init(Cipher.ENCRYPT_MODE, secretKey, gcmSpec);
             byte[] cipherText = cipher.doFinal(originalData.getBytes(StandardCharsets.UTF_8));
 
+            // 4. 拼接 IV + CipherText
             byte[] encryptedDataWithIv = new byte[iv.length + cipherText.length];
             System.arraycopy(iv, 0, encryptedDataWithIv, 0, iv.length);
             System.arraycopy(cipherText, 0, encryptedDataWithIv, iv.length, cipherText.length);
             String encryptedBase64 = Base64.getEncoder().encodeToString(encryptedDataWithIv);
 
-            String wrappedKeyMock = "【L-ABE-封装密钥Mock】_等待格密码模块接入(" + policy + ")";
+            // 5. 模拟密钥封装 (实际应使用 L-ABE，这里将密钥 Base64 包装后返回)
+            String keyBase64 = Base64.getEncoder().encodeToString(secretKey.getEncoded());
+            String wrappedKeyMock = "LABE_WRAP_BC:" + policy + ":" + keyBase64;
 
             // ==========================================
             // 在 IDEA 控制台打印加密后的硬核结果
             // ==========================================
-            System.out.println("[成功] AES-256-GCM 加密完成！");
+            System.out.println("[成功] AES-256-GCM 加密完成 (BouncyCastle)！");
+            System.out.println("[输出] 密钥 (Base64): " + keyBase64);
             System.out.println("[输出] 最终生成的 Base64 密文: " + encryptedBase64);
             System.out.println("[输出] " + wrappedKeyMock);
             System.out.println("======================================\n");
@@ -71,6 +78,7 @@ public class EncryptController {
             response.put("message", "真实 AES-256 加密成功 (Powered by BouncyCastle)！");
             response.put("encryptedData", encryptedBase64);
             response.put("wrappedKey", wrappedKeyMock);
+            response.put("algorithm", "AES-256-GCM-BC");
 
         } catch (Exception e) {
             System.err.println("[错误] 加密过程发生崩溃: " + e.getMessage());

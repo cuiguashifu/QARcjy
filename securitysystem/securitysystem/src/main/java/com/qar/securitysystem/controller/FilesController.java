@@ -1,5 +1,7 @@
 package com.qar.securitysystem.controller;
 
+import com.qar.securitysystem.dto.EncryptedFileResponse;
+import com.qar.securitysystem.dto.EncryptedFileUploadRequest;
 import com.qar.securitysystem.dto.FileRecordResponse;
 import com.qar.securitysystem.model.FileRecordEntity;
 import com.qar.securitysystem.model.PersonRecordEntity;
@@ -16,6 +18,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -36,6 +39,7 @@ public class FilesController {
         this.personRecordRepository = personRecordRepository;
     }
 
+    @Deprecated
     @PostMapping
     public ResponseEntity<FileRecordResponse> upload(
             Authentication authentication,
@@ -64,17 +68,33 @@ public class FilesController {
         return ResponseEntity.ok(resp);
     }
 
+    @PostMapping("/encrypted")
+    public ResponseEntity<FileRecordResponse> uploadEncrypted(
+            Authentication authentication,
+            @RequestBody EncryptedFileUploadRequest request
+    ) {
+        AppPrincipal p = SecurityUtil.requirePrincipal(authentication);
+        boolean isAdmin = p.getRole().name().equals("ADMIN");
+        if (!isAdmin) {
+            return ResponseEntity.status(403).build();
+        }
+        
+        UserEntity uploader = userRepository.findById(p.getUserId()).orElseThrow();
+        UserEntity target = new UserEntity();
+        target.setId(uploader.getId());
+        target.setPersonId(uploader.getPersonId());
+        
+        FileRecordResponse resp = fileService.storeEncrypted(target, request);
+        return ResponseEntity.ok(resp);
+    }
+
     @GetMapping
     public ResponseEntity<List<FileRecordResponse>> listMine(Authentication authentication) {
         AppPrincipal p = SecurityUtil.requirePrincipal(authentication);
-        java.util.List<String> ids = new java.util.ArrayList<>();
-        ids.add(p.getUserId());
-        if (p.getPersonId() != null && !p.getPersonId().isBlank()) {
-            ids.add(p.getPersonId());
-        }
-        return ResponseEntity.ok(fileService.listMine(ids));
+        return ResponseEntity.ok(fileService.listAll());
     }
 
+    @Deprecated
     @GetMapping("/{id}/download")
     public ResponseEntity<byte[]> download(Authentication authentication, @PathVariable("id") String id) {
         AppPrincipal p = SecurityUtil.requirePrincipal(authentication);
@@ -91,6 +111,18 @@ public class FilesController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + safeFilename(r.getOriginalName()) + "\"")
                 .contentType(MediaType.parseMediaType(r.getContentType() == null ? MediaType.APPLICATION_OCTET_STREAM_VALUE : r.getContentType()))
                 .body(raw);
+    }
+
+    @GetMapping("/{id}/encrypted")
+    public ResponseEntity<EncryptedFileResponse> downloadEncrypted(Authentication authentication, @PathVariable("id") String id) {
+        AppPrincipal p = SecurityUtil.requirePrincipal(authentication);
+        FileRecordEntity r = fileService.getRecordOrNull(id);
+        if (r == null) {
+            return ResponseEntity.status(404).build();
+        }
+        
+        EncryptedFileResponse resp = fileService.getEncryptedData(r);
+        return ResponseEntity.ok(resp);
     }
 
     private static String safeFilename(String name) {

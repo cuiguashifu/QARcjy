@@ -2,6 +2,8 @@ package com.qar.securitysystem.service;
 
 import com.qar.securitysystem.controller.DecryptController;
 import com.qar.securitysystem.controller.EncryptController;
+import com.qar.securitysystem.dto.EncryptedFileResponse;
+import com.qar.securitysystem.dto.EncryptedFileUploadRequest;
 import com.qar.securitysystem.dto.FileRecordResponse;
 import com.qar.securitysystem.model.FileRecordEntity;
 import com.qar.securitysystem.model.UserEntity;
@@ -29,6 +31,7 @@ public class FileService {
         this.decryptController = decryptController;
     }
 
+    @Deprecated
     public FileRecordResponse uploadAndEncrypt(UserEntity user, MultipartFile file, String policy) {
         if (policy == null || policy.isBlank()) {
             policy = "role:user";
@@ -75,14 +78,54 @@ public class FileService {
         return toResponse(r);
     }
 
+    public FileRecordResponse storeEncrypted(UserEntity user, EncryptedFileUploadRequest request) {
+        if (request.getEncryptedData() == null || request.getEncryptedData().isBlank()) {
+            throw new IllegalArgumentException("encrypted_data_required");
+        }
+
+        String policy = request.getPolicy();
+        if (policy == null || policy.isBlank()) {
+            policy = "role:user";
+        }
+
+        FileRecordEntity r = new FileRecordEntity();
+        r.setId(IdUtil.newId());
+        String ownerKey = user.getPersonId() == null || user.getPersonId().isBlank() ? user.getId() : user.getPersonId();
+        r.setOwnerId(ownerKey);
+        r.setOriginalName(request.getOriginalName() == null ? "encrypted.bin" : request.getOriginalName());
+        r.setContentType(request.getContentType() == null ? MediaType.APPLICATION_OCTET_STREAM_VALUE : request.getContentType());
+        r.setSizeBytes(request.getSizeBytes() != null ? request.getSizeBytes() : 0L);
+        r.setPolicy(policy);
+        r.setWrappedKey(request.getWrappedKey());
+        r.setEncryptedData(request.getEncryptedData());
+        r.setCreatedAt(Instant.now());
+
+        fileRecordRepository.save(r);
+        
+        System.out.println("\n========== 密文存储成功 ==========");
+        System.out.println("[记录ID] " + r.getId());
+        System.out.println("[文件名] " + r.getOriginalName());
+        System.out.println("[策略] " + r.getPolicy());
+        System.out.println("[密文长度] " + r.getEncryptedData().length() + " 字符");
+        System.out.println("[WrappedKey] " + r.getWrappedKey());
+        System.out.println("==================================\n");
+        
+        return toResponse(r);
+    }
+
     public List<FileRecordResponse> listMine(List<String> ownerIds) {
         return fileRecordRepository.findAllByOwnerIdInOrderByCreatedAtDesc(ownerIds).stream().map(this::toResponse).toList();
+    }
+
+    public List<FileRecordResponse> listAll() {
+        return fileRecordRepository.findAll().stream().map(this::toResponse).toList();
     }
 
     public FileRecordEntity getRecordOrNull(String id) {
         return fileRecordRepository.findById(id).orElse(null);
     }
 
+    @Deprecated
     public byte[] decryptForDownload(FileRecordEntity record) {
         Map<String, String> req = new HashMap<>();
         req.put("encryptedData", record.getEncryptedData());
@@ -102,6 +145,24 @@ public class FileService {
         }
 
         return Base64.getDecoder().decode(decryptedData);
+    }
+
+    public EncryptedFileResponse getEncryptedData(FileRecordEntity record) {
+        EncryptedFileResponse resp = new EncryptedFileResponse();
+        resp.setEncryptedData(record.getEncryptedData());
+        resp.setWrappedKey(record.getWrappedKey());
+        resp.setOriginalName(record.getOriginalName());
+        resp.setContentType(record.getContentType());
+        resp.setPolicy(record.getPolicy());
+        
+        System.out.println("\n========== 密文派发 ==========");
+        System.out.println("[记录ID] " + record.getId());
+        System.out.println("[文件名] " + record.getOriginalName());
+        System.out.println("[密文长度] " + record.getEncryptedData().length() + " 字符");
+        System.out.println("[WrappedKey] " + record.getWrappedKey());
+        System.out.println("================================\n");
+        
+        return resp;
     }
 
     private FileRecordResponse toResponse(FileRecordEntity r) {

@@ -15,10 +15,13 @@ import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
+import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.PrintWriter;
+import java.util.List;
 
 @Configuration
 public class SecurityConfig {
@@ -37,24 +40,33 @@ public class SecurityConfig {
         CookieCsrfTokenRepository csrfRepo = CookieCsrfTokenRepository.withHttpOnlyFalse();
         csrfRepo.setCookiePath("/");
 
+        CsrfTokenRequestAttributeHandler requestHandler = new CsrfTokenRequestAttributeHandler();
+        // setCsrfRequestAttributeName(null) is important for Spring Security 6 to resolve the token properly
+        requestHandler.setCsrfRequestAttributeName(null);
+
         http
-                .csrf(csrf -> csrf
-                        .csrfTokenRepository(csrfRepo)
-                        .ignoringRequestMatchers("/h2/**")
-                        .ignoringRequestMatchers("/api/auth/**")
-                )
+                .cors(cors -> cors.configurationSource(request -> {
+                    CorsConfiguration config = new CorsConfiguration();
+                    config.setAllowedOrigins(List.of("*"));
+                    config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+                    config.setAllowedHeaders(List.of("*"));
+                    return config;
+                }))
+                .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.GET, "/", "/auth", "/h2/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/workbench", "/workbench.html").authenticated()
                         .requestMatchers(HttpMethod.GET, "/feedback", "/feedback.html").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/admin", "/admin.html").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/admin", "/admin.html").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.GET, "/auth.html").permitAll()
                         .requestMatchers(HttpMethod.GET, "/assets/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/csrf").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/files").hasRole("ADMIN")
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/files").hasAuthority("ROLE_ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/admin/account-requests/*/approve").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/admin/account-requests/*/reject").authenticated()
+                        .requestMatchers("/api/admin/**").hasAuthority("ROLE_ADMIN")
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll()
                 )
@@ -66,8 +78,7 @@ public class SecurityConfig {
                 )
                 .headers(headers -> headers
                         .frameOptions(frame -> frame.disable())
-                )
-                .cors(Customizer.withDefaults());
+                );
 
         return http.build();
     }

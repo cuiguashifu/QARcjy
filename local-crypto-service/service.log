@@ -1,0 +1,29 @@
+========================================
+  QAR 本地加密服务已启动
+  监听地址: http://127.0.0.1:18234
+========================================
+
+可用接口:
+  POST /encrypt  - 加密数据
+  POST /decrypt  - 解密数据
+  GET  /health   - 健康检查
+  GET  /status   - 服务状态
+
+
+========== 加密请求 ==========
+[输入] 明文长度: 48 字符
+[输入] 策略: role:user
+[密钥存储] 已存储密钥: LABE_WRAP:role:user:MTFGzTu+dr/uArTk...[L-ABE加密预留]
+[成功] AES-256-GCM 加密完成
+[输出] 密文长度: 104 字符
+[输出] WrappedKey: LABE_WRAP:role:user:MTFGzTu+dr/uArTk...[L-ABE加密预留]
+================================
+
+========== 解密请求 ==========
+[输入] 密文长度: 104 字符
+[输入] WrappedKey: LABE_WRAP:role:user:MTFGzTu+dr/uArTk...[L-ABE????]
+[输入] 策略: role:user
+[密钥存储] 查找密钥: LABE_WRAP:role:user:MTFGzTu+dr/uArTk...[L-ABE????]
+[密钥存储] 当前存储的密钥数量: 1
+[密钥存储] 存储的密钥列表: [LABE_WRAP:role:user:MTFGzTu+dr/uArTk...[L-ABE加密预留]]
+[密钥存储] 从持久化存储查找: 未找到

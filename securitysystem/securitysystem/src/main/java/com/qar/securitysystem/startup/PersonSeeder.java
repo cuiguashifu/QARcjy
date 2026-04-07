@@ -4,18 +4,23 @@ import com.qar.securitysystem.config.PersonSeedProperties;
 import com.qar.securitysystem.model.PersonRecordEntity;
 import com.qar.securitysystem.repo.PersonRecordRepository;
 import com.qar.securitysystem.util.IdUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Component;
 
+import java.io.InputStreamReader;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 
 @Component
 public class PersonSeeder implements ApplicationRunner {
+    private static final Logger log = LoggerFactory.getLogger(PersonSeeder.class);
     private final PersonRecordRepository personRecordRepository;
     private final PersonSeedProperties props;
     private final ResourceLoader resourceLoader;
@@ -38,8 +43,17 @@ public class PersonSeeder implements ApplicationRunner {
         if (!r.exists()) {
             return;
         }
-        String content = new String(r.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        List<String> lines = content.lines().toList();
+        byte[] rawBytes = r.getInputStream().readAllBytes();
+        log.info("Raw bytes (first 100): {}", java.util.Arrays.toString(java.util.Arrays.copyOf(rawBytes, Math.min(100, rawBytes.length))));
+        String rawContent = new String(rawBytes, StandardCharsets.UTF_8);
+        log.info("Raw content as UTF-8: {}", rawContent);
+        log.info("Testing '张' encoding: {}", java.util.Arrays.toString("张".getBytes(StandardCharsets.UTF_8)));
+        int zhangIndex = rawContent.indexOf("张");
+        if (zhangIndex >= 0) {
+            log.info("'张' found at index: {}", zhangIndex);
+            log.info("'张' bytes in file: {}", java.util.Arrays.toString(java.util.Arrays.copyOfRange(rawBytes, zhangIndex, zhangIndex + 3)));
+        }
+        List<String> lines = rawContent.lines().toList();
         if (lines.isEmpty()) {
             return;
         }
@@ -77,6 +91,8 @@ public class PersonSeeder implements ApplicationRunner {
             e.setAirline(airline.isBlank() ? null : airline);
             e.setPositionTitle(positionTitle.isBlank() ? null : positionTitle);
             e.setCreatedAt(Instant.now());
+            log.info("Saving person: personNo={}, fullName={}, fullName bytes={}", 
+                personNo, fullName, java.util.Arrays.toString(fullName.getBytes(StandardCharsets.UTF_8)));
             personRecordRepository.save(e);
         }
     }

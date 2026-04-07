@@ -63,7 +63,7 @@ body{
 .tab{padding:12px 10px;margin-bottom:-1px;border-bottom:2px solid transparent;color:var(--muted);font-weight:700;cursor:pointer}
 .tab.active{border-bottom-color:var(--primary);color:var(--text)}
 
-.toast{position:fixed;top:18px;right:18px;min-width:260px;max-width:380px;background:#fff;border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:12px 14px;display:none}
+.toast{position:fixed;top:60px;right:18px;min-width:260px;max-width:380px;background:#fff;border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:12px 14px;display:none;z-index:100}
 .toast.show{display:block}
 .toast .t{font-weight:800;margin-bottom:4px}
 .toast .m{color:var(--muted);font-size:13px}
