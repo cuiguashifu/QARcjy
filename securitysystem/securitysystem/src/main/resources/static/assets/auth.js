@@ -96,12 +96,28 @@ async function onRegister() {
   }
   btn.disabled = true
   try {
-    await apiFetch("/api/auth/register", {
+    const res = await apiFetch("/api/auth/register", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({ emailOrUsername: u, fullName, idLast4, contact, airline, positionTitle, department, password: p, passwordConfirm: p2 })
     })
-    showToast("申请已提交", "请等待管理员审核通过后再登录", "success")
+    
+    // Download private key
+    if (res.privateKey) {
+      const blob = new Blob([res.privateKey], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `private_key_${u}.pem`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast("申请已提交", "请妥善保管自动下载的私钥文件，审核通过后需使用该私钥解密下载数据", "success")
+    } else {
+      showToast("申请已提交", "请等待管理员审核通过后再登录", "success")
+    }
+    
     await switchTab("login")
   } catch (e) {
     showToast("注册失败", e.message, "danger")

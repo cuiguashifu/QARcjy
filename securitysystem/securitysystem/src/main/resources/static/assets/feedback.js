@@ -20,6 +20,7 @@ async function ensureMe() {
   document.getElementById("me-pill").textContent = me.emailOrUsername + " · " + me.role
   if (me.role === "admin") {
     document.getElementById("admin-link").style.display = "inline"
+    document.getElementById("admin-data-link").style.display = "inline"
   }
   return me
 }

@@ -3,6 +3,7 @@ package com.qar.securitysystem.controller;
 import com.qar.securitysystem.dto.EncryptedFileResponse;
 import com.qar.securitysystem.dto.EncryptedFileUploadRequest;
 import com.qar.securitysystem.dto.FileRecordResponse;
+import com.qar.securitysystem.dto.PlainFilePayloadResponse;
 import com.qar.securitysystem.model.FileRecordEntity;
 import com.qar.securitysystem.model.PersonRecordEntity;
 import com.qar.securitysystem.model.UserEntity;
@@ -25,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/files")
@@ -69,7 +71,7 @@ public class FilesController {
     }
 
     @PostMapping("/encrypted")
-    public ResponseEntity<FileRecordResponse> uploadEncrypted(
+    public ResponseEntity<?> uploadEncrypted(
             Authentication authentication,
             @RequestBody EncryptedFileUploadRequest request
     ) {
@@ -82,7 +84,20 @@ public class FilesController {
         UserEntity uploader = userRepository.findById(p.getUserId()).orElseThrow();
         UserEntity target = new UserEntity();
         target.setId(uploader.getId());
-        target.setPersonId(uploader.getPersonId());
+        String targetPersonNo = request == null ? null : request.getPersonNo();
+        if ((targetPersonNo == null || targetPersonNo.isBlank()) && request != null && request.getPolicy() != null) {
+            targetPersonNo = extractPersonNoFromPolicy(request.getPolicy());
+        }
+
+        if (targetPersonNo != null && !targetPersonNo.isBlank()) {
+            PersonRecordEntity pr = personRecordRepository.findByPersonNo(targetPersonNo.trim()).orElse(null);
+            if (pr == null) {
+                return ResponseEntity.badRequest().body(Map.of("code", 400, "message", "profile_not_found"));
+            }
+            target.setPersonId(pr.getId());
+        } else {
+            target.setPersonId(uploader.getPersonId());
+        }
         
         FileRecordResponse resp = fileService.storeEncrypted(target, request);
         return ResponseEntity.ok(resp);
@@ -91,7 +106,16 @@ public class FilesController {
     @GetMapping
     public ResponseEntity<List<FileRecordResponse>> listMine(Authentication authentication) {
         AppPrincipal p = SecurityUtil.requirePrincipal(authentication);
-        return ResponseEntity.ok(fileService.listAll());
+        boolean isAdmin = p.getRole().name().equals("ADMIN");
+        if (isAdmin) {
+            return ResponseEntity.ok(fileService.listAll());
+        }
+        List<String> ownerIds = new java.util.ArrayList<>();
+        ownerIds.add(p.getUserId());
+        if (p.getPersonId() != null && !p.getPersonId().isBlank()) {
+            ownerIds.add(p.getPersonId());
+        }
+        return ResponseEntity.ok(fileService.listMine(ownerIds));
     }
 
     @Deprecated
@@ -120,8 +144,32 @@ public class FilesController {
         if (r == null) {
             return ResponseEntity.status(404).build();
         }
-        
-        EncryptedFileResponse resp = fileService.getEncryptedData(r);
+        boolean isAdmin = p.getRole().name().equals("ADMIN");
+        if (!isAdmin && !r.getOwnerId().equals(p.getUserId()) && (p.getPersonId() == null || !r.getOwnerId().equals(p.getPersonId()))) {
+            return ResponseEntity.status(403).build();
+        }
+
+        UserEntity user = userRepository.findById(p.getUserId()).orElseThrow();
+        EncryptedFileResponse resp = fileService.getEncryptedDataForUser(r, user);
+        return ResponseEntity.ok(resp);
+    }
+
+    @GetMapping("/{id}/payload")
+    public ResponseEntity<PlainFilePayloadResponse> payload(Authentication authentication, @PathVariable("id") String id) {
+        AppPrincipal p = SecurityUtil.requirePrincipal(authentication);
+        FileRecordEntity r = fileService.getRecordOrNull(id);
+        if (r == null) {
+            return ResponseEntity.status(404).build();
+        }
+        boolean isAdmin = p.getRole().name().equals("ADMIN");
+        if (!isAdmin && !r.getOwnerId().equals(p.getUserId()) && (p.getPersonId() == null || !r.getOwnerId().equals(p.getPersonId()))) {
+            return ResponseEntity.status(403).build();
+        }
+        PlainFilePayloadResponse resp = new PlainFilePayloadResponse();
+        resp.setDataBase64(r.getEncryptedData());
+        resp.setOriginalName(r.getOriginalName() == null ? null : r.getOriginalName().replace("\u0000", "").replace("\r", " ").replace("\n", " ").trim());
+        resp.setContentType(r.getContentType());
+        resp.setSizeBytes(r.getSizeBytes());
         return ResponseEntity.ok(resp);
     }
 
@@ -130,5 +178,20 @@ public class FilesController {
             return "download.bin";
         }
         return name.replace("\n", " ").replace("\r", " ");
+    }
+
+    private static String extractPersonNoFromPolicy(String policy) {
+        String p = policy == null ? "" : policy.trim();
+        if (p.isBlank()) {
+            return null;
+        }
+        String[] parts = p.split("[,;| ]+");
+        for (String part : parts) {
+            if (part.startsWith("personNo:")) {
+                String v = part.substring("personNo:".length()).trim();
+                return v.isBlank() ? null : v;
+            }
+        }
+        return null;
     }
 }

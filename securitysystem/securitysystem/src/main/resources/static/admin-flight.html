@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>飞行数据管理 - QAR 安全系统</title>
+    <link rel="stylesheet" href="/assets/app.css" />
+    <style>
+      .filters { display: flex; gap: 16px; margin-bottom: 16px; align-items: flex-end; flex-wrap: wrap; }
+      .filters .col { display: flex; flex-direction: column; gap: 4px; }
+      .table th.sortable { cursor: pointer; user-select: none; position: relative; padding-right: 20px; }
+      .table th.sortable:after { content: '↕'; position: absolute; right: 4px; opacity: 0.3; }
+      .table th.sortable.asc:after { content: '↑'; opacity: 1; }
+      .table th.sortable.desc:after { content: '↓'; opacity: 1; }
+      .row-input { width: 100%; min-height: 120px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    </style>
+  </head>
+  <body>
+    <div class="nav">
+      <div class="nav-inner">
+        <div class="brand">QAR 安全系统</div>
+        <a class="link" href="/workbench">工作台</a>
+        <a class="link" href="/feedback">反馈与联系</a>
+        <a class="link" href="/admin">管理后台</a>
+        <a class="link" href="/admin-data.html">数据管理</a>
+        <a class="link active" href="/admin-flight.html">飞行数据管理</a>
+        <div class="spacer"></div>
+        <div class="pill" id="me-pill">-</div>
+        <button class="btn" id="btn-logout">退出</button>
+      </div>
+    </div>
+
+    <div class="container">
+      <div class="card" style="margin-bottom: 16px;">
+        <div class="card-h">
+          <div class="row" style="justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px">
+            <div>
+              <div class="h2">飞行数据（QAR表格）</div>
+              <div class="muted">展示已上传的xlsx飞行数据；支持筛选与时间排序（不包含表头行）</div>
+            </div>
+            <div class="row" style="gap:8px;flex-wrap:wrap">
+              <button class="btn" id="btn-refresh">刷新</button>
+              <select class="input" id="file-select" style="width:320px"></select>
+            </div>
+          </div>
+        </div>
+        <div class="card-b">
+          <div class="filters">
+            <div class="col">
+              <div class="label">关键词</div>
+              <input class="input" id="filter-keyword" placeholder="任意字段/ID..." style="width:220px" />
+            </div>
+            <div class="col">
+              <div class="label">起始日期</div>
+              <input class="input" type="date" id="filter-date-start" />
+            </div>
+            <div class="col">
+              <div class="label">截止日期</div>
+              <input class="input" type="date" id="filter-date-end" />
+            </div>
+            <div class="col">
+              <div class="label">时间排序</div>
+              <div class="row" style="gap:8px">
+                <button class="btn" id="btn-time-asc">升序</button>
+                <button class="btn" id="btn-time-desc">降序</button>
+              </div>
+            </div>
+            <button class="btn" id="btn-reset-filters">重置筛选</button>
+          </div>
+
+          <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+            <div class="label">工作表</div>
+            <div class="row" id="sheet-tabs" style="gap:8px;flex-wrap:wrap"></div>
+            <div class="muted" id="sheet-meta"></div>
+          </div>
+
+          <div style="overflow:auto;margin-top:16px">
+            <table class="table" id="qar-table">
+              <thead></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div id="empty-msg" class="muted" style="display:none; text-align:center; padding: 20px;">暂无数据</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast">
+      <div class="t">提示</div>
+      <div class="m"></div>
+    </div>
+
+    <script src="/assets/common.js"></script>
+    <script src="/assets/transport.js"></script>
+    <script src="/assets/admin-flight.js"></script>
+  </body>
+</html>

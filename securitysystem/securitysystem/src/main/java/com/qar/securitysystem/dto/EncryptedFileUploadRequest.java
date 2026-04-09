@@ -7,6 +7,7 @@ public class EncryptedFileUploadRequest {
     private String contentType;
     private Long sizeBytes;
     private String policy;
+    private String personNo;
 
     public String getEncryptedData() { return encryptedData; }
     public void setEncryptedData(String encryptedData) { this.encryptedData = encryptedData; }
@@ -20,4 +21,6 @@ public class EncryptedFileUploadRequest {
     public void setSizeBytes(Long sizeBytes) { this.sizeBytes = sizeBytes; }
     public String getPolicy() { return policy; }
     public void setPolicy(String policy) { this.policy = policy; }
+    public String getPersonNo() { return personNo; }
+    public void setPersonNo(String personNo) { this.personNo = personNo; }
 }

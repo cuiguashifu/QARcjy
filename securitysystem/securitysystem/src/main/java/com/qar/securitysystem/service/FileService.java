@@ -8,35 +8,40 @@ import com.qar.securitysystem.dto.FileRecordResponse;
 import com.qar.securitysystem.model.FileRecordEntity;
 import com.qar.securitysystem.model.UserEntity;
 import com.qar.securitysystem.repo.FileRecordRepository;
+import com.qar.securitysystem.repo.UserRepository;
 import com.qar.securitysystem.util.IdUtil;
+import com.qar.securitysystem.util.RSAUtil;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+import javax.crypto.Cipher;
+import java.security.PublicKey;
+import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.nio.charset.StandardCharsets;
 
 @Service
 public class FileService {
     private final FileRecordRepository fileRecordRepository;
+    private final UserRepository userRepository;
     private final EncryptController encryptController;
     private final DecryptController decryptController;
 
-    public FileService(FileRecordRepository fileRecordRepository, EncryptController encryptController, DecryptController decryptController) {
+    public FileService(FileRecordRepository fileRecordRepository, UserRepository userRepository, EncryptController encryptController, DecryptController decryptController) {
         this.fileRecordRepository = fileRecordRepository;
+        this.userRepository = userRepository;
         this.encryptController = encryptController;
         this.decryptController = decryptController;
     }
 
-    @Deprecated
     public FileRecordResponse uploadAndEncrypt(UserEntity user, MultipartFile file, String policy) {
-        if (policy == null || policy.isBlank()) {
-            policy = "role:user";
-        }
-
         byte[] raw;
         try {
             raw = file.getBytes();
@@ -44,23 +49,8 @@ public class FileService {
             throw new IllegalArgumentException("file_read_failed", e);
         }
 
-        String base64Original = Base64.getEncoder().encodeToString(raw);
-        Map<String, String> req = new HashMap<>();
-        req.put("data", base64Original);
-        req.put("policy", policy);
-        Map<String, Object> crypto = encryptController.processEncryption(req);
-
-        Object codeObj = crypto.get("code");
-        int code = codeObj instanceof Number ? ((Number) codeObj).intValue() : 500;
-        if (code != 200) {
-            throw new IllegalStateException("encrypt_failed");
-        }
-
-        String encryptedData = (String) crypto.get("encryptedData");
-        String wrappedKey = (String) crypto.get("wrappedKey");
-        if (encryptedData == null || encryptedData.isBlank()) {
-            throw new IllegalStateException("encrypt_no_ciphertext");
-        }
+        // Store as plain text on server
+        String plainDataBase64 = Base64.getEncoder().encodeToString(raw);
 
         FileRecordEntity r = new FileRecordEntity();
         r.setId(IdUtil.newId());
@@ -70,8 +60,8 @@ public class FileService {
         r.setContentType(file.getContentType() == null ? MediaType.APPLICATION_OCTET_STREAM_VALUE : file.getContentType());
         r.setSizeBytes(raw.length);
         r.setPolicy(policy);
-        r.setWrappedKey(wrappedKey);
-        r.setEncryptedData(encryptedData);
+        r.setWrappedKey("PLAIN_TEXT"); // Indicates it's stored as plain text
+        r.setEncryptedData(plainDataBase64); // Actually storing plain text
         r.setCreatedAt(Instant.now());
 
         fileRecordRepository.save(r);
@@ -79,37 +69,21 @@ public class FileService {
     }
 
     public FileRecordResponse storeEncrypted(UserEntity user, EncryptedFileUploadRequest request) {
-        if (request.getEncryptedData() == null || request.getEncryptedData().isBlank()) {
-            throw new IllegalArgumentException("encrypted_data_required");
-        }
-
-        String policy = request.getPolicy();
-        if (policy == null || policy.isBlank()) {
-            policy = "role:user";
-        }
-
+        // Even if the client sends "encrypted" data, we treat it as the data to store.
+        // If the requirement is server stores plain text, we assume the client sends plain text here.
         FileRecordEntity r = new FileRecordEntity();
         r.setId(IdUtil.newId());
         String ownerKey = user.getPersonId() == null || user.getPersonId().isBlank() ? user.getId() : user.getPersonId();
         r.setOwnerId(ownerKey);
-        r.setOriginalName(request.getOriginalName() == null ? "encrypted.bin" : request.getOriginalName());
+        r.setOriginalName(normalizeFilename(request.getOriginalName()));
         r.setContentType(request.getContentType() == null ? MediaType.APPLICATION_OCTET_STREAM_VALUE : request.getContentType());
         r.setSizeBytes(request.getSizeBytes() != null ? request.getSizeBytes() : 0L);
-        r.setPolicy(policy);
-        r.setWrappedKey(request.getWrappedKey());
-        r.setEncryptedData(request.getEncryptedData());
+        r.setPolicy(request.getPolicy());
+        r.setWrappedKey("PLAIN_TEXT");
+        r.setEncryptedData(request.getEncryptedData()); // Storing as-is
         r.setCreatedAt(Instant.now());
 
         fileRecordRepository.save(r);
-        
-        System.out.println("\n========== 密文存储成功 ==========");
-        System.out.println("[记录ID] " + r.getId());
-        System.out.println("[文件名] " + r.getOriginalName());
-        System.out.println("[策略] " + r.getPolicy());
-        System.out.println("[密文长度] " + r.getEncryptedData().length() + " 字符");
-        System.out.println("[WrappedKey] " + r.getWrappedKey());
-        System.out.println("==================================\n");
-        
         return toResponse(r);
     }
 
@@ -125,43 +99,63 @@ public class FileService {
         return fileRecordRepository.findById(id).orElse(null);
     }
 
-    @Deprecated
     public byte[] decryptForDownload(FileRecordEntity record) {
-        Map<String, String> req = new HashMap<>();
-        req.put("encryptedData", record.getEncryptedData());
-        req.put("key", "");
-        req.put("policy", record.getPolicy() == null ? "" : record.getPolicy());
-        Map<String, Object> out = decryptController.processDecryption(req);
+        // Since it's stored as plain text, we just decode the base64
+        return Base64.getDecoder().decode(record.getEncryptedData());
+    }
 
-        Object codeObj = out.get("code");
-        int code = codeObj instanceof Number ? ((Number) codeObj).intValue() : 500;
-        if (code != 200) {
-            throw new IllegalStateException("decrypt_failed");
+    public EncryptedFileResponse getEncryptedDataForUser(FileRecordEntity record, UserEntity user) {
+        if (user.getPublicKey() == null || user.getPublicKey().isBlank()) {
+            throw new IllegalStateException("user_public_key_missing");
         }
 
-        String decryptedData = (String) out.get("decryptedData");
-        if (decryptedData == null) {
-            throw new IllegalStateException("decrypt_no_plaintext");
+        byte[] plainData = Base64.getDecoder().decode(record.getEncryptedData());
+        
+        try {
+            // 1. Generate random AES key
+            KeyGenerator keyGen = KeyGenerator.getInstance("AES");
+            keyGen.init(256);
+            SecretKey aesKey = keyGen.generateKey();
+            
+            // 2. Generate random IV
+            byte[] iv = new byte[16];
+            new SecureRandom().nextBytes(iv);
+            
+            // 3. Encrypt data with AES-CBC
+            Cipher aesCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+            aesCipher.init(Cipher.ENCRYPT_MODE, aesKey, new IvParameterSpec(iv));
+            byte[] encryptedData = aesCipher.doFinal(plainData);
+            
+            // 4. Combine IV + EncryptedData
+            byte[] ivAndData = new byte[iv.length + encryptedData.length];
+            System.arraycopy(iv, 0, ivAndData, 0, iv.length);
+            System.arraycopy(encryptedData, 0, ivAndData, iv.length, encryptedData.length);
+            
+            // 5. Encrypt AES key with User's RSA Public Key
+            PublicKey pubKey = RSAUtil.getPublicKey(user.getPublicKey());
+            byte[] encryptedAesKey = RSAUtil.encrypt(aesKey.getEncoded(), pubKey);
+            
+            EncryptedFileResponse resp = new EncryptedFileResponse();
+            resp.setEncryptedData(Base64.getEncoder().encodeToString(ivAndData));
+            resp.setWrappedKey(Base64.getEncoder().encodeToString(encryptedAesKey));
+            resp.setOriginalName(record.getOriginalName());
+            resp.setContentType(record.getContentType());
+            resp.setPolicy(record.getPolicy());
+            
+            return resp;
+        } catch (Exception e) {
+            throw new RuntimeException("failed_to_encrypt_for_transmission", e);
         }
-
-        return Base64.getDecoder().decode(decryptedData);
     }
 
     public EncryptedFileResponse getEncryptedData(FileRecordEntity record) {
+        // This is the old method, we should probably not use it if we want transmission encryption
         EncryptedFileResponse resp = new EncryptedFileResponse();
         resp.setEncryptedData(record.getEncryptedData());
         resp.setWrappedKey(record.getWrappedKey());
         resp.setOriginalName(record.getOriginalName());
         resp.setContentType(record.getContentType());
         resp.setPolicy(record.getPolicy());
-        
-        System.out.println("\n========== 密文派发 ==========");
-        System.out.println("[记录ID] " + record.getId());
-        System.out.println("[文件名] " + record.getOriginalName());
-        System.out.println("[密文长度] " + record.getEncryptedData().length() + " 字符");
-        System.out.println("[WrappedKey] " + record.getWrappedKey());
-        System.out.println("================================\n");
-        
         return resp;
     }
 
@@ -169,12 +163,34 @@ public class FileService {
         FileRecordResponse resp = new FileRecordResponse();
         resp.setId(r.getId());
         resp.setOwnerId(r.getOwnerId());
-        resp.setOriginalName(r.getOriginalName());
+        resp.setOriginalName(normalizeFilename(r.getOriginalName()));
         resp.setContentType(r.getContentType());
         resp.setSizeBytes(r.getSizeBytes());
         resp.setPolicy(r.getPolicy());
         resp.setWrappedKey(r.getWrappedKey());
         resp.setCreatedAt(r.getCreatedAt() == null ? null : r.getCreatedAt().toString());
         return resp;
+    }
+
+    private static String normalizeFilename(String name) {
+        if (name == null || name.isBlank()) {
+            return "data.bin";
+        }
+        String cleaned = name.replace("\u0000", "").replace("\r", " ").replace("\n", " ").trim();
+        if (cleaned.matches("(?i)^QAR\\?+\\.xlsx$")) {
+            return "QAR示例数据.xlsx";
+        }
+        if (!cleaned.contains("?")) {
+            return cleaned;
+        }
+        try {
+            byte[] bytes = cleaned.getBytes(StandardCharsets.ISO_8859_1);
+            String utf8 = new String(bytes, StandardCharsets.UTF_8).trim();
+            if (!utf8.isBlank() && !utf8.contains("�")) {
+                return utf8;
+            }
+        } catch (Exception e) {
+        }
+        return cleaned;
     }
 }

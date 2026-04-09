@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>数据管理 - QAR 安全系统</title>
+    <link rel="stylesheet" href="/assets/app.css" />
+    <style>
+      .filters { display: flex; gap: 16px; margin-bottom: 16px; align-items: flex-end; flex-wrap: wrap; }
+      .filters .col { display: flex; flex-direction: column; gap: 4px; }
+      .table th.sortable { cursor: pointer; user-select: none; position: relative; padding-right: 20px; }
+      .table th.sortable:after { content: '↕'; position: absolute; right: 4px; opacity: 0.3; }
+      .table th.sortable.asc:after { content: '↑'; opacity: 1; }
+      .table th.sortable.desc:after { content: '↓'; opacity: 1; }
+    </style>
+  </head>
+  <body>
+    <div class="nav">
+      <div class="nav-inner">
+        <div class="brand">QAR 安全系统</div>
+        <a class="link" href="/workbench">工作台</a>
+        <a class="link" href="/feedback">反馈与联系</a>
+        <a class="link" href="/admin">管理后台</a>
+        <a class="link active" href="/admin-data.html">数据管理</a>
+        <a class="link" href="/admin-flight.html">飞行数据管理</a>
+        <div class="spacer"></div>
+        <div class="pill" id="me-pill">-</div>
+        <button class="btn" id="btn-logout">退出</button>
+      </div>
+    </div>
+
+    <div class="container">
+      <div class="card">
+        <div class="card-h">
+          <div class="row" style="justify-content:space-between">
+            <div>
+              <div class="h2">人员基础数据管理</div>
+              <div class="muted">查看、增加、修改或删除数据库中的人员信息记录</div>
+            </div>
+            <div class="row">
+              <button class="btn primary" id="btn-add-person">添加人员</button>
+              <button class="btn" id="btn-refresh-persons">刷新</button>
+            </div>
+          </div>
+        </div>
+        <div class="card-b">
+          <div class="filters">
+            <div class="col">
+              <div class="label">关键词搜索</div>
+              <input class="input" id="search-keyword" placeholder="姓名/工号/部门..." style="width:200px" />
+            </div>
+            <div class="col">
+              <div class="label">起始日期</div>
+              <input class="input" type="date" id="filter-date-start" />
+            </div>
+            <div class="col">
+              <div class="label">截止日期</div>
+              <input class="input" type="date" id="filter-date-end" />
+            </div>
+            <button class="btn" id="btn-reset-filters">重置筛选</button>
+          </div>
+
+          <table class="table" id="persons">
+            <thead>
+              <tr>
+                <th class="sortable" data-sort="personNo">工号</th>
+                <th class="sortable" data-sort="fullName">姓名</th>
+                <th class="sortable" data-sort="airline">航司</th>
+                <th class="sortable" data-sort="positionTitle">职位</th>
+                <th class="sortable" data-sort="department">部门</th>
+                <th class="sortable" data-sort="phone">电话</th>
+                <th class="sortable" data-sort="createdAt">创建时间</th>
+                <th class="actions">操作</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <div id="empty-msg" class="muted" style="display:none; text-align:center; padding: 20px;">暂无匹配的数据记录</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast">
+      <div class="t">提示</div>
+      <div class="m"></div>
+    </div>
+
+    <script src="/assets/common.js"></script>
+    <script src="/assets/admin-data.js"></script>
+  </body>
+</html>
