@@ -7,17 +7,76 @@
     <link rel="stylesheet" href="/assets/app.css" />
   </head>
   <body>
-    <div class="container" style="min-height:100%;display:flex;align-items:center;justify-content:center">
-      <div class="card" style="width:480px;max-width:92vw">
-        <div class="card-h">
-          <div class="h1">欢迎使用 QAR 安全系统</div>
-          <div class="muted">登录后可加密上传并按权限解密下载</div>
+    <div class="page">
+      <div class="left">
+        <div class="brand">
+          <div class="brand-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+          </div>
+          <span>QAR 安全系统</span>
         </div>
-        <div class="tabs" style="margin-top:12px">
-          <div class="tab active" id="tab-login">登录</div>
-          <div class="tab" id="tab-register">注册</div>
+        <div class="characters-area">
+          <div class="characters-container">
+            <!-- Purple -->
+            <div class="char purple">
+              <div class="eyes">
+                <div class="eyeball">
+                  <div class="pupil-inner"></div>
+                </div>
+                <div class="eyeball">
+                  <div class="pupil-inner"></div>
+                </div>
+              </div>
+            </div>
+            <!-- Black -->
+            <div class="char black">
+              <div class="eyes">
+                <div class="eyeball">
+                  <div class="pupil-inner"></div>
+                </div>
+                <div class="eyeball">
+                  <div class="pupil-inner"></div>
+                </div>
+              </div>
+            </div>
+            <!-- Orange -->
+            <div class="char orange">
+              <div class="eyes">
+                <div class="pupil"></div>
+                <div class="pupil"></div>
+              </div>
+            </div>
+            <!-- Yellow -->
+            <div class="char yellow">
+              <div class="eyes">
+                <div class="pupil"></div>
+                <div class="pupil"></div>
+              </div>
+              <div class="mouth"></div>
+            </div>
+          </div>
         </div>
-        <div class="card-b">
+        <!-- 移除了底部链接 -->
+        <div class="deco-grid"></div>
+        <div class="deco-circle deco-circle-1"></div>
+        <div class="deco-circle deco-circle-2"></div>
+      </div>
+      <div class="right">
+        <div class="form-wrapper">
+          <div class="mobile-brand">
+            <div class="brand-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            </div>
+            <span>QAR 安全系统</span>
+          </div>
+          <div class="header">
+            <h1>欢迎回来！</h1>
+            <p>请输入您的登录信息</p>
+          </div>
+          <div class="tabs">
+            <div class="tab active" id="tab-login">登录</div>
+            <div class="tab" id="tab-register">注册</div>
+          </div>
           <div id="logged-in" style="display:none" class="col">
             <div class="badge ok" id="me-badge">已登录</div>
             <div class="row">
@@ -25,55 +84,72 @@
               <button class="btn" id="btn-logout">退出登录</button>
             </div>
           </div>
-
-          <div id="panel-login" class="col">
-            <div class="col">
-              <div class="label">学号/工号</div>
-              <input class="input" id="login-username" autocomplete="username" placeholder="例如：20260001" />
+          <div id="panel-login" class="form form-panel active">
+            <div class="field">
+              <label for="login-username">学号/工号</label>
+              <input id="login-username" type="text" placeholder="例如：20260001" autocomplete="username" />
             </div>
-            <div class="col">
-              <div class="label">密码</div>
-              <input class="input" id="login-password" type="password" autocomplete="current-password" />
+            <div class="field">
+              <label for="login-password">密码</label>
+              <div class="password-wrap">
+                <input id="login-password" type="password" placeholder="••••••••" autocomplete="current-password" />
+                <button type="button" class="eye-btn" id="toggle-password">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                </button>
+              </div>
+            </div>
+            <div class="options">
+              <label class="remember"><input type="checkbox" /> 记住我</label>
+              <a href="#" class="forgot">忘记密码？</a>
             </div>
             <button class="btn primary" id="btn-login">登录</button>
           </div>
-
-          <div id="panel-register" class="col" style="display:none">
-            <div class="col">
-              <div class="label">学号/工号</div>
-              <input class="input" id="reg-username" autocomplete="username" placeholder="必须与档案库一致" />
+          <div id="panel-register" class="form form-panel">
+            <div class="field">
+              <label for="reg-username">学号/工号</label>
+              <input id="reg-username" type="text" placeholder="必须与档案库一致" autocomplete="username" />
             </div>
-            <div class="col">
-              <div class="label">姓名</div>
-              <input class="input" id="reg-fullname" autocomplete="name" placeholder="必须与档案库一致" />
+            <div class="field">
+              <label for="reg-fullname">姓名</label>
+              <input id="reg-fullname" type="text" placeholder="必须与档案库一致" autocomplete="name" />
             </div>
-            <div class="col">
-              <div class="label">身份证后四位</div>
-              <input class="input" id="reg-idlast4" inputmode="numeric" maxlength="4" placeholder="例如：1234" />
+            <div class="field">
+              <label for="reg-idlast4">身份证后四位</label>
+              <input id="reg-idlast4" type="text" inputmode="numeric" maxlength="4" placeholder="例如：1234" />
             </div>
-            <div class="col">
-              <div class="label">联系方式</div>
-              <input class="input" id="reg-contact" inputmode="tel" placeholder="手机号/座机/邮箱" />
+            <div class="field">
+              <label for="reg-contact">联系方式</label>
+              <input id="reg-contact" type="text" inputmode="tel" placeholder="手机号/座机/邮箱" />
             </div>
-            <div class="col">
-              <div class="label">航司</div>
-              <input class="input" id="reg-airline" placeholder="例如：CAUC" />
+            <div class="field">
+              <label for="reg-airline">航司</label>
+              <input id="reg-airline" type="text" placeholder="例如：CAUC" />
             </div>
-            <div class="col">
-              <div class="label">所属职位</div>
-              <input class="input" id="reg-position" placeholder="例如：机长/副驾驶/签派员" />
+            <div class="field">
+              <label for="reg-position">所属职位</label>
+              <input id="reg-position" type="text" placeholder="例如：机长/副驾驶/签派员" />
             </div>
-            <div class="col">
-              <div class="label">所属部门</div>
-              <input class="input" id="reg-dept" placeholder="例如：飞行一部" />
+            <div class="field">
+              <label for="reg-dept">所属部门</label>
+              <input id="reg-dept" type="text" placeholder="例如：飞行一部" />
             </div>
-            <div class="col">
-              <div class="label">设置密码</div>
-              <input class="input" id="reg-password" type="password" autocomplete="new-password" />
+            <div class="field">
+              <label for="reg-password">设置密码</label>
+              <div class="password-wrap">
+                <input id="reg-password" type="password" placeholder="••••••••" autocomplete="new-password" />
+                <button type="button" class="eye-btn" id="toggle-reg-password">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                </button>
+              </div>
             </div>
-            <div class="col">
-              <div class="label">确认密码</div>
-              <input class="input" id="reg-password2" type="password" autocomplete="new-password" />
+            <div class="field">
+              <label for="reg-password2">确认密码</label>
+              <div class="password-wrap">
+                <input id="reg-password2" type="password" placeholder="••••••••" autocomplete="new-password" />
+                <button type="button" class="eye-btn" id="toggle-reg-password2">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                </button>
+              </div>
             </div>
             <button class="btn primary" id="btn-register">提交申请</button>
             <div class="muted">提交后需管理员审核通过才会创建账号</div>
