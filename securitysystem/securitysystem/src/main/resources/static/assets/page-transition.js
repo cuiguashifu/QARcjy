@@ -1,206 +1,160 @@
-/**
- * 页面重定向切换动态效果
- * 参考MVCHelper的状态管理和动画过渡思想
- */
+var PageTransitions = (function() {
 
-class PageTransition {
-  constructor() {
-    this.isTransitioning = false;
-    this.transitionDuration = 300; // 过渡动画持续时间（毫秒）
-    this.init();
+  var loader = null;
+  var isAnimating = false;
+
+  var effects = {
+    1: {
+      opening: 'M20,15 50,30 50,30 30,30 Z;M0,0 80,0 50,30 20,45 Z;M0,0 80,0 60,45 0,60 Z;M0,0 80,0 80,60 0,60 Z',
+      closing: 'M0,0 80,0 60,45 0,60 Z;M0,0 80,0 50,30 20,45 Z;M20,15 50,30 50,30 30,30 Z;M30,30 50,30 50,30 30,30 Z',
+      initial: 'M30,30 50,30 50,30 30,30 Z',
+      speedIn: 100
+    },
+    4: {
+      opening: 'M 0,0 0,60 80,60 80,0 Z M 40,30 40,30 40,30 40,30 Z',
+      closing: '',
+      initial: 'M 0,0 0,60 80,60 80,0 Z M 80,0 80,60 0,60 0,0 Z',
+      speedIn: 300
+    },
+    7: {
+      opening: 'M 0,60 80,60 80,50 0,40 0,60;M 0,60 80,60 80,25 0,40 0,60;M 0,60 80,60 80,25 0,10 0,60;M 0,60 80,60 80,0 0,0 0,60',
+      closing: 'M 0,60 80,60 80,20 0,0 0,60;M 0,60 80,60 80,20 0,40 0,60;m 0,60 80,0 0,0 -80,0',
+      initial: 'm 0,60 80,0 0,0 -80,0',
+      speedIn: 200
+    },
+    10: {
+      opening: 'M 40,-65 145,80 -65,80 40,-65',
+      closing: 'm 40,-65 0,0 L -65,80 40,-65',
+      initial: 'M 40,-65 145,80 40,-65',
+      speedIn: 500
+    },
+    13: {
+      opening: 'm 40,-80 190,0 -305,290 C -100,140 0,0 40,-80 z',
+      closing: '',
+      initial: 'm 75,-80 155,0 0,225 C 90,85 100,30 75,-80 z',
+      speedIn: 700
+    }
+  };
+
+  var currentEffect = effects[1];
+
+  function createLoaderOverlay() {
+    var existing = document.getElementById('pageload-overlay');
+    if (existing) return existing;
+
+    var overlay = document.createElement('div');
+    overlay.id = 'pageload-overlay';
+    overlay.className = 'pageload-overlay';
+
+    if (currentEffect.opening) overlay.setAttribute('data-opening', currentEffect.opening);
+    if (currentEffect.closing) overlay.setAttribute('data-closing', currentEffect.closing);
+
+    var svgNS = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('height', '100%');
+    svg.setAttribute('viewBox', '0 0 80 60');
+    svg.setAttribute('preserveAspectRatio', 'none');
+
+    var path = document.createElementNS(svgNS, 'path');
+    path.setAttribute('d', currentEffect.initial);
+    svg.appendChild(path);
+    overlay.appendChild(svg);
+
+    document.body.appendChild(overlay);
+    return overlay;
   }
 
-  init() {
-    // 监听所有链接的点击事件
-    document.addEventListener('click', (e) => {
-      const target = e.target.closest('a');
-      if (target && !this.isTransitioning) {
-        const href = target.getAttribute('href');
-        if (href && !href.startsWith('#') && !href.startsWith('javascript:')) {
-          e.preventDefault();
-          this.navigate(href);
-        }
-      }
-    });
-
-    // 初始化页面加载动画
-    this.initPageLoadAnimation();
+  function initLoader() {
+    var overlayEl = createLoaderOverlay();
+    if (typeof SVGLoader !== 'undefined') {
+      loader = new SVGLoader(overlayEl, {
+        speedIn: currentEffect.speedIn || 300,
+        easingIn: typeof mina !== 'undefined' ? mina.easeinout : undefined
+      });
+    }
   }
 
-  /**
-   * 初始化页面加载动画
-   */
-  initPageLoadAnimation() {
-    // 添加页面加载遮罩
-    const loader = document.createElement('div');
-    loader.id = 'page-loader';
-    loader.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background-color: rgba(255, 255, 255, 0.9);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 9999;
-      transition: opacity ${this.transitionDuration}ms ease-in-out;
-    `;
-
-    // 添加加载动画
-    const spinner = document.createElement('div');
-    spinner.style.cssText = `
-      width: 50px;
-      height: 50px;
-      border: 5px solid #f3f3f3;
-      border-top: 5px solid #3498db;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    `;
-
-    const style = document.createElement('style');
-    style.textContent = `
-      @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-      }
-    `;
-
-    document.head.appendChild(style);
-    loader.appendChild(spinner);
-    document.body.appendChild(loader);
-
-    // 页面加载完成后隐藏加载动画
-    window.addEventListener('load', () => {
-      setTimeout(() => {
-        loader.style.opacity = '0';
-        setTimeout(() => {
-          loader.style.display = 'none';
-        }, this.transitionDuration);
-      }, 500);
-    });
-  }
-
-  /**
-   * 页面导航
-   * @param {string} url - 目标URL
-   */
-  async navigate(url) {
-    if (this.isTransitioning) return;
-
-    this.isTransitioning = true;
-
-    try {
-      // 显示加载动画
-      const loader = document.getElementById('page-loader');
-      if (loader) {
-        loader.style.display = 'flex';
-        loader.style.opacity = '1';
-      }
-
-      // 执行页面淡出动画
-      await this.fadeOut();
-
-      // 重定向到目标URL
+  function navigateTo(url) {
+    if (isAnimating) return;
+    if (!loader) {
       window.location.href = url;
-    } catch (error) {
-      console.error('页面导航失败:', error);
-      this.isTransitioning = false;
+      return;
     }
+
+    isAnimating = true;
+    loader.show();
+
+    setTimeout(function() {
+      loader.hide();
+      setTimeout(function() {
+        window.location.href = url;
+      }, Math.max(currentEffect.speedIn || 300, 350));
+    }, 600);
   }
 
-  /**
-   * 页面淡出动画
-   * @returns {Promise} - 动画完成的Promise
-   */
-  fadeOut() {
-    return new Promise((resolve) => {
-      document.body.style.opacity = '1';
-      document.body.style.transition = `opacity ${this.transitionDuration}ms ease-in-out`;
-      
-      setTimeout(() => {
-        document.body.style.opacity = '0';
-        
-        setTimeout(() => {
-          resolve();
-        }, this.transitionDuration);
-      }, 100);
+  function playInAnimation() {
+    if (!loader) return;
+
+    var shouldAnimate = sessionStorage.getItem('pt-pageload-in');
+    if (!shouldAnimate) return;
+    sessionStorage.removeItem('pt-pageload-in');
+
+    isAnimating = true;
+    loader.show();
+
+    setTimeout(function() {
+      loader.hide();
+      setTimeout(function() {
+        var overlay = document.getElementById('pageload-overlay');
+        if (overlay) {
+          overlay.classList.remove('pageload-loading', 'show');
+          overlay.style.visibility = 'hidden';
+        }
+        isAnimating = false;
+      }, Math.max(currentEffect.speedIn || 300, 400));
+    }, 400);
+  }
+
+  function init() {
+    initLoader();
+
+    playInAnimation();
+
+    document.addEventListener('click', function(e) {
+      var link = e.target.closest('a');
+      if (!link) return;
+
+      var href = link.getAttribute('href');
+      if (!href || href.startsWith('#') || href.startsWith('javascript:') || link.target === '_blank') return;
+
+      var isInternal = href.startsWith('/') || (href.indexOf(window.location.host) > -1);
+      if (isInternal && !href.startsWith('/api/')) {
+        e.preventDefault();
+        sessionStorage.setItem('pt-pageload-in', '1');
+        navigateTo(href);
+      }
     });
   }
 
-  /**
-   * 页面淡入动画
-   */
-  fadeIn() {
-    document.body.style.opacity = '0';
-    document.body.style.transition = `opacity ${this.transitionDuration}ms ease-in-out`;
-    
-    setTimeout(() => {
-      document.body.style.opacity = '1';
-    }, 100);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
   }
 
-  /**
-   * 执行带动态效果的重定向
-   * @param {string} url - 目标URL
-   * @param {string} effect - 动画效果类型：'fade'（淡入淡出）、'slide'（滑动）
-   */
-  redirectWithEffect(url, effect = 'fade') {
-    if (this.isTransitioning) return;
-
-    this.isTransitioning = true;
-
-    switch (effect) {
-      case 'slide':
-        this.slideOut(url);
-        break;
-      case 'fade':
-      default:
-        this.navigate(url);
-        break;
-    }
-  }
-
-  /**
-   * 页面滑动动画
-   * @param {string} url - 目标URL
-   */
-  async slideOut(url) {
-    try {
-      // 显示加载动画
-      const loader = document.getElementById('page-loader');
-      if (loader) {
-        loader.style.display = 'flex';
-        loader.style.opacity = '1';
+  return {
+    navigateTo: navigateTo,
+    setEffect: function(id) {
+      if (effects[id]) {
+        currentEffect = effects[id];
+        var overlay = document.getElementById('pageload-overlay');
+        if (overlay) {
+          overlay.parentNode.removeChild(overlay);
+        }
+        initLoader();
       }
-
-      // 执行页面滑动动画
-      document.body.style.transform = 'translateX(0)';
-      document.body.style.transition = `transform ${this.transitionDuration}ms ease-in-out`;
-      
-      setTimeout(() => {
-        document.body.style.transform = 'translateX(-100%)';
-        
-        setTimeout(() => {
-          window.location.href = url;
-        }, this.transitionDuration);
-      }, 100);
-    } catch (error) {
-      console.error('页面滑动动画失败:', error);
-      this.isTransitioning = false;
     }
-  }
-}
+  };
 
-// 初始化页面过渡效果
-window.addEventListener('DOMContentLoaded', () => {
-  window.pageTransition = new PageTransition();
-  // 页面加载时执行淡入动画
-  window.pageTransition.fadeIn();
-});
-
-// 导出PageTransition类
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = PageTransition;
-}
+})();

@@ -5,14 +5,20 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>数据管理 - QAR 安全系统</title>
     <link rel="stylesheet" href="/assets/app.css" />
+    <link rel="stylesheet" href="/assets/page-animations.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="/assets/webgl/three.min.js"></script>
     <script src="/assets/webgl/Detector.js"></script>
     <script src="/assets/clouds.js"></script>
-    <script src="/assets/meteor.js"></script>
+    <script src="/assets/sakura.js"></script>
     <script src="/assets/sidebar.js"></script>
-  </head>  <style>
+    <script src="/assets/snap.svg-min.js"></script>
+    <script src="/assets/svgLoader.js"></script>
+    <script src="/assets/page-transition.js?v=4"></script>
+    <script src="/assets/classie.js?v=2"></script>
+    <script src="/assets/sidebarEffects.js?v=2"></script>
+    <style>
       .filters { display: flex; gap: 16px; margin-bottom: 16px; align-items: flex-end; flex-wrap: wrap; }
       .filters .col { display: flex; flex-direction: column; gap: 4px; }
       .table th.sortable { cursor: pointer; user-select: none; position: relative; padding-right: 20px; }
@@ -22,48 +28,60 @@
     </style>
   </head>
   <body>
-    <!-- 移动端菜单按钮 -->
-    <div class="menu_icon">☰</div>
-    
-    <!-- 侧边栏菜单 -->
-    <div class="sidenav_menu">
-      <div class="close_btn">×</div>
-      <ul class="sidebar-menu">
-        <li class="sidebar-header">QAR 安全系统</li>
-        <li>
-          <a href="/workbench">
-            <i class="fa fa-dashboard"></i> 工作台
-          </a>
-        </li>
-        <li>
-          <a href="/feedback">
-            <i class="fa fa-envelope"></i> 反馈与联系
-          </a>
-        </li>
-        <li class="active">
-          <a href="#">
-            <i class="fa fa-cogs"></i> 管理后台
-            <i class="fa fa-angle-down"></i>
-          </a>
-          <ul class="sub-menu">
-            <li><a href="/admin"><i class="fa fa-home"></i> 管理首页</a></li>
-            <li class="active"><a href="/admin-data.html"><i class="fa fa-database"></i> 数据管理</a></li>
-            <li><a href="/admin-flight.html"><i class="fa fa-plane"></i> 飞行数据管理</a></li>
-          </ul>
-        </li>
-        <li class="sidebar-header">用户</li>
-        <li>
-          <a href="#" id="me-pill-sidebar">未登录</a>
-        </li>
-        <li>
-          <a href="#" id="btn-logout-sidebar">
-            <i class="fa fa-sign-out"></i> 退出
-          </a>
-        </li>
-      </ul>
-    </div>
+    <div id="st-container" class="st-container">
+      <!-- 侧边栏 -->
+      <nav class="st-menu st-effect-12" id="menu-12">
+        <h2>QAR 安全系统</h2>
+        <ul class="sidebar-menu">
+          <li>
+            <a href="/workbench">
+              <i class="fa fa-dashboard"></i> 工作台
+            </a>
+          </li>
+          <li>
+            <a href="/feedback">
+              <i class="fa fa-envelope"></i> 反馈与联系
+            </a>
+          </li>
+          <li class="active">
+            <a href="#">
+              <i class="fa fa-cogs"></i> 管理后台
+              <i class="fa fa-angle-down"></i>
+            </a>
+            <ul class="sub-menu">
+              <li><a href="/admin"><i class="fa fa-home"></i> 管理首页</a></li>
+              <li class="active"><a href="/admin-data.html"><i class="fa fa-database"></i> 数据管理</a></li>
+              <li><a href="/admin-flight.html"><i class="fa fa-plane"></i> 飞行数据管理</a></li>
+            </ul>
+          </li>
+          <li class="sidebar-header">用户</li>
+          <li>
+            <a href="#" id="me-pill-sidebar">未登录</a>
+          </li>
+          <li>
+            <a href="#" id="btn-logout-sidebar">
+              <i class="fa fa-sign-out"></i> 退出
+            </a>
+          </li>
+        </ul>
+      </nav>
 
-    <div class="container">
+      <!-- 内容容器 -->
+      <div class="st-pusher">
+        <div class="st-content">
+          <!-- 顶部导航栏 -->
+          <div class="nav">
+            <div class="nav-inner">
+              <button data-effect="st-effect-12" class="menu-trigger">☰</button>
+              <div class="brand">QAR 安全系统</div>
+              <div class="spacer"></div>
+              <div id="me-pill" class="pill">
+                <span>加载中...</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="container">
       <div class="card">
         <div class="card-h">
           <div class="row" style="justify-content:space-between">
@@ -110,6 +128,9 @@
             <tbody></tbody>
           </table>
           <div id="empty-msg" class="muted" style="display:none; text-align:center; padding: 20px;">暂无匹配的数据记录</div>
+        </div>
+      </div>
+          </div>
         </div>
       </div>
     </div>

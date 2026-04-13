@@ -27,7 +27,14 @@ async function ensureAdmin() {
     location.href = "/workbench"
     return null
   }
-  document.getElementById("me-pill").textContent = me.emailOrUsername + " · " + me.role
+  const mePill = document.getElementById("me-pill")
+  if (mePill) {
+    mePill.textContent = me.emailOrUsername + " · " + me.role
+  }
+  const mePillSidebar = document.getElementById("me-pill-sidebar")
+  if (mePillSidebar) {
+    mePillSidebar.textContent = me.emailOrUsername + " · " + me.role
+  }
   await TransportCrypto.ensureSession()
   return me
 }
@@ -247,7 +254,8 @@ async function loadPreview() {
 }
 
 async function onLogout() {
-  const btn = document.getElementById("btn-logout")
+  const btn = document.getElementById("btn-logout-sidebar")
+  if (!btn) return
   btn.disabled = true
   try {
     await apiFetch("/api/auth/logout", { method: "POST" })
@@ -272,33 +280,60 @@ function onResetFilters() {
 async function main() {
   const me = await ensureAdmin()
   if (!me) return
-  document.getElementById("btn-logout").addEventListener("click", onLogout)
-  document.getElementById("btn-refresh").addEventListener("click", refreshFiles)
-  document.getElementById("btn-reset-filters").addEventListener("click", onResetFilters)
-  document.getElementById("filter-keyword").addEventListener("input", () => {
-    state.keyword = document.getElementById("filter-keyword").value || ""
-    renderAll()
-  })
-  document.getElementById("filter-date-start").addEventListener("change", () => {
-    state.dateStart = document.getElementById("filter-date-start").value || ""
-    renderAll()
-  })
-  document.getElementById("filter-date-end").addEventListener("change", () => {
-    state.dateEnd = document.getElementById("filter-date-end").value || ""
-    renderAll()
-  })
-  document.getElementById("btn-time-asc").addEventListener("click", () => {
-    state.timeSortDir = "asc"
-    renderAll()
-  })
-  document.getElementById("btn-time-desc").addEventListener("click", () => {
-    state.timeSortDir = "desc"
-    renderAll()
-  })
-  document.getElementById("file-select").addEventListener("change", async (e) => {
-    state.fileId = e.target.value
-    await loadPreview()
-  })
+  const btnLogout = document.getElementById("btn-logout-sidebar")
+  if (btnLogout) {
+    btnLogout.addEventListener("click", onLogout)
+  }
+  const btnRefresh = document.getElementById("btn-refresh")
+  if (btnRefresh) {
+    btnRefresh.addEventListener("click", refreshFiles)
+  }
+  const btnResetFilters = document.getElementById("btn-reset-filters")
+  if (btnResetFilters) {
+    btnResetFilters.addEventListener("click", onResetFilters)
+  }
+  const filterKeyword = document.getElementById("filter-keyword")
+  if (filterKeyword) {
+    filterKeyword.addEventListener("input", () => {
+      state.keyword = filterKeyword.value || ""
+      renderAll()
+    })
+  }
+  const filterDateStart = document.getElementById("filter-date-start")
+  if (filterDateStart) {
+    filterDateStart.addEventListener("change", () => {
+      state.dateStart = filterDateStart.value || ""
+      renderAll()
+    })
+  }
+  const filterDateEnd = document.getElementById("filter-date-end")
+  if (filterDateEnd) {
+    filterDateEnd.addEventListener("change", () => {
+      state.dateEnd = filterDateEnd.value || ""
+      renderAll()
+    })
+  }
+  const btnTimeAsc = document.getElementById("btn-time-asc")
+  if (btnTimeAsc) {
+    btnTimeAsc.addEventListener("click", () => {
+      state.timeSortDir = "asc"
+      renderAll()
+    })
+  }
+  const btnTimeDesc = document.getElementById("btn-time-desc")
+  if (btnTimeDesc) {
+    btnTimeDesc.addEventListener("click", () => {
+      state.timeSortDir = "desc"
+      renderAll()
+    })
+  }
+  const fileSelect = document.getElementById("file-select")
+  if (fileSelect) {
+    fileSelect.addEventListener("change", async (e) => {
+      state.fileId = e.target.value
+      await loadPreview()
+    })
+  }
   await refreshFiles()
 }
 
