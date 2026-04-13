@@ -5,21 +5,178 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>管理后台 - QAR 安全系统</title>
     <link rel="stylesheet" href="/assets/app.css" />
+    <link rel="stylesheet" href="/assets/page-animations.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="/assets/webgl/three.min.js"></script>
+    <script src="/assets/webgl/Detector.js"></script>
+    <script src="/assets/clouds.js"></script>
+    <script src="/assets/sakura.js"></script>
+    <script src="/assets/sidebar.js"></script>
+    <script src="/assets/snap.svg-min.js"></script>
+    <script src="/assets/svgLoader.js"></script>
+    <script src="/assets/page-transition.js?v=4"></script>
+    <script src="/assets/classie.js?v=2"></script>
+    <script src="/assets/sidebarEffects.js?v=2"></script>
+    <script>
+      async function ensureMe() {
+        await initCsrf()
+        const me = await loadMe()
+        if (!me) {
+          location.href = "/auth"
+          return null
+        }
+        const mePill = document.getElementById("me-pill")
+        if (mePill) {
+          mePill.textContent = me.emailOrUsername + " · " + me.role
+        }
+        const mePillSidebar = document.getElementById("me-pill-sidebar")
+        if (mePillSidebar) {
+          mePillSidebar.textContent = me.emailOrUsername + " · " + me.role
+        }
+        return me
+      }
+
+      async function onLogout() {
+        await fetch("/api/auth/logout", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-TOKEN": getCsrfToken()
+          }
+        })
+        location.href = "/auth"
+      }
+
+      async function initCsrf() {
+        const tokenMeta = document.querySelector("meta[name='_csrf']")
+        const headerMeta = document.querySelector("meta[name='_csrf_header']")
+        if (tokenMeta && headerMeta) {
+          const token = tokenMeta.getAttribute("content")
+          const header = headerMeta.getAttribute("content")
+          window.getCsrfToken = () => token
+          window.getCsrfHeader = () => header
+        }
+      }
+
+      async function loadMe() {
+        const res = await fetch("/api/auth/me")
+        if (res.status === 200) {
+          return await res.json()
+        }
+        return null
+      }
+
+      async function main() {
+        const me = await ensureMe()
+        if (!me) return
+        
+        const btnLogout = document.getElementById("btn-logout")
+        if (btnLogout) {
+          btnLogout.addEventListener("click", onLogout)
+        }
+        const btnLogoutSidebar = document.getElementById("btn-logout-sidebar")
+        if (btnLogoutSidebar) {
+          btnLogoutSidebar.addEventListener("click", onLogout)
+        }
+        
+        await refreshList()
+      }
+
+      main()
+    </script>
   </head>
   <body>
-    <div class="nav">
-      <div class="nav-inner">
-        <div class="brand">QAR 安全系统</div>
-        <a class="link" href="/workbench">工作台</a>
-        <a class="link" href="/feedback">反馈与联系</a>
-        <a class="link" href="/admin">管理后台</a>
-        <div class="spacer"></div>
-        <div class="pill" id="me-pill">-</div>
-        <button class="btn" id="btn-logout">退出</button>
-      </div>
-    </div>
+    <div id="st-container" class="st-container">
+      <!-- 侧边栏 -->
+      <nav class="st-menu st-effect-12" id="menu-12">
+        <h2>QAR 安全系统</h2>
+        <ul class="sidebar-menu">
+          <li>
+            <a href="/workbench">
+              <i class="fa fa-dashboard"></i> 工作台
+            </a>
+          </li>
+          <li>
+            <a href="/feedback">
+              <i class="fa fa-envelope"></i> 反馈与联系
+            </a>
+          </li>
+          <li class="active">
+            <a href="#">
+              <i class="fa fa-cogs"></i> 管理后台
+              <i class="fa fa-angle-down"></i>
+            </a>
+            <ul class="sub-menu">
+              <li class="active"><a href="/admin"><i class="fa fa-home"></i> 管理首页</a></li>
+              <li><a href="/admin-data.html"><i class="fa fa-database"></i> 数据管理</a></li>
+              <li><a href="/admin-flight.html"><i class="fa fa-plane"></i> 飞行数据管理</a></li>
+            </ul>
+          </li>
+          <li class="sidebar-header">用户</li>
+          <li>
+            <a href="#" id="me-pill-sidebar">未登录</a>
+          </li>
+          <li>
+            <a href="#" id="btn-logout-sidebar">
+              <i class="fa fa-sign-out"></i> 退出
+            </a>
+          </li>
+        </ul>
+      </nav>
 
-    <div class="container">
+      <!-- 内容容器 -->
+      <div class="st-pusher">
+        <div class="st-content">
+          <!-- 顶部导航栏 -->
+          <div class="nav">
+            <div class="nav-inner">
+              <button data-effect="st-effect-12" class="menu-trigger">☰</button>
+              <div class="brand">QAR 安全系统</div>
+              <div class="spacer"></div>
+              <div id="me-pill" class="pill">
+                <span>加载中...</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="container">
+      <!-- 概览卡片 -->
+      <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 24px;">
+        <div class="card stats-card">
+          <div class="card-h">
+            <div class="h2">用户总数</div>
+          </div>
+          <div class="card-b">
+            <div class="stats-value" id="total-users">0</div>
+            <div class="stats-desc">系统注册用户</div>
+          </div>
+        </div>
+        <div class="card stats-card">
+          <div class="card-h">
+            <div class="h2">待审核申请</div>
+          </div>
+          <div class="card-b">
+            <div class="stats-value" id="pending-requests">0</div>
+            <div class="stats-desc">需要处理的申请</div>
+          </div>
+        </div>
+        <div class="card stats-card">
+          <div class="h2">数据总量</div>
+          <div class="card-b">
+            <div class="stats-value" id="total-data">0</div>
+            <div class="stats-desc">已上传文件数</div>
+          </div>
+        </div>
+        <div class="card stats-card">
+          <div class="h2">未处理反馈</div>
+          <div class="card-b">
+            <div class="stats-value" id="pending-feedback">0</div>
+            <div class="stats-desc">需要回复的反馈</div>
+          </div>
+        </div>
+      </div>
+
       <div class="grid" style="grid-template-columns:1fr">
         <div class="card">
           <div class="card-h">
@@ -27,16 +184,18 @@
             <div class="muted">仅 admin 可查看；admin 为预置唯一用户</div>
           </div>
           <div class="card-b">
-            <table class="table" id="users">
-              <thead>
-                <tr>
-                  <th>用户</th>
-                  <th>角色</th>
-                  <th>创建时间</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
+            <div class="table-responsive">
+              <table class="table" id="users">
+                <thead>
+                  <tr>
+                    <th>用户</th>
+                    <th>角色</th>
+                    <th>创建时间</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
           </div>
         </div>
 
@@ -51,22 +210,24 @@
             </div>
           </div>
           <div class="card-b">
-            <table class="table" id="requests">
-              <thead>
-                <tr>
-                  <th>申请ID</th>
-                  <th>工号</th>
-                  <th>姓名</th>
-                  <th>航司</th>
-                  <th>职位</th>
-                  <th>部门</th>
-                  <th>联系方式</th>
-                  <th>提交时间</th>
-                  <th class="actions">操作</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
+            <div class="table-responsive">
+              <table class="table" id="requests">
+                <thead>
+                  <tr>
+                    <th>申请ID</th>
+                    <th>工号</th>
+                    <th>姓名</th>
+                    <th>航司</th>
+                    <th>职位</th>
+                    <th>部门</th>
+                    <th>联系方式</th>
+                    <th>提交时间</th>
+                    <th class="actions">操作</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
           </div>
         </div>
 
@@ -81,20 +242,22 @@
             </div>
           </div>
           <div class="card-b">
-            <table class="table" id="files">
-              <thead>
-                <tr>
-                  <th>记录ID</th>
-                  <th>归属用户</th>
-                  <th>文件名</th>
-                  <th>大小</th>
-                  <th>策略</th>
-                  <th>上传时间</th>
-                  <th class="actions">操作</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
+            <div class="table-responsive">
+              <table class="table" id="files">
+                <thead>
+                  <tr>
+                    <th>记录ID</th>
+                    <th>归属用户</th>
+                    <th>文件名</th>
+                    <th>大小</th>
+                    <th>策略</th>
+                    <th>上传时间</th>
+                    <th class="actions">操作</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
           </div>
         </div>
 
@@ -109,20 +272,22 @@
             </div>
           </div>
           <div class="card-b">
-            <table class="table" id="feedback">
-              <thead>
-                <tr>
-                  <th>反馈ID</th>
-                  <th>用户</th>
-                  <th>主题</th>
-                  <th>类型</th>
-                  <th>状态</th>
-                  <th>更新时间</th>
-                  <th class="actions">操作</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
+            <div class="table-responsive">
+              <table class="table" id="feedback">
+                <thead>
+                  <tr>
+                    <th>反馈ID</th>
+                    <th>用户</th>
+                    <th>主题</th>
+                    <th>类型</th>
+                    <th>状态</th>
+                    <th>更新时间</th>
+                    <th class="actions">操作</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
           </div>
         </div>
 
@@ -137,20 +302,25 @@
             </div>
           </div>
           <div class="card-b">
-            <table class="table" id="logs">
-              <thead>
-                <tr>
-                  <th>时间</th>
-                  <th>工号</th>
-                  <th>方法</th>
-                  <th>路径</th>
-                  <th>状态</th>
-                  <th>耗时</th>
-                  <th>IP</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
+            <div class="table-responsive">
+              <table class="table" id="logs">
+                <thead>
+                  <tr>
+                    <th>时间</th>
+                    <th>工号</th>
+                    <th>方法</th>
+                    <th>路径</th>
+                    <th>状态</th>
+                    <th>耗时</th>
+                    <th>IP</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
           </div>
         </div>
       </div>

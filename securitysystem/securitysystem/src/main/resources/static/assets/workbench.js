@@ -5,7 +5,14 @@ async function ensureMe() {
     location.href = "/auth"
     return null
   }
-  document.getElementById("me-pill").textContent = me.emailOrUsername + " · " + me.role
+  const mePill = document.getElementById("me-pill")
+  if (mePill) {
+    mePill.textContent = me.emailOrUsername + " · " + me.role
+  }
+  const mePillSidebar = document.getElementById("me-pill-sidebar")
+  if (mePillSidebar) {
+    mePillSidebar.textContent = me.emailOrUsername + " · " + me.role
+  }
   const pfName = document.getElementById("pf-name")
   const pfNo = document.getElementById("pf-no")
   const pfAirline = document.getElementById("pf-airline")
@@ -17,7 +24,20 @@ async function ensureMe() {
   if (pfPos) pfPos.value = me.positionTitle || "-"
   if (pfDept) pfDept.value = me.department || ""
   if (me.role === "admin") {
-    document.getElementById("admin-link").style.display = "inline"
+    const adminLink = document.getElementById("admin-link")
+    if (adminLink) {
+      adminLink.style.display = "inline"
+    }
+    const adminDataLink = document.getElementById("admin-data-link")
+    if (adminDataLink) {
+      adminDataLink.style.display = "inline"
+    }
+    const ql = document.getElementById("admin-qar-link")
+    if (ql) ql.style.display = "inline"
+    const adminMenu = document.getElementById("admin-menu")
+    if (adminMenu) {
+      adminMenu.style.display = "block"
+    }
   } else {
     const uc = document.getElementById("upload-card")
     if (uc) uc.style.display = "none"
@@ -27,7 +47,7 @@ async function ensureMe() {
   return me
 }
 
-async function checkLocalCryptoService() {
+async function checkTransportCrypto() {
   const statusEl = document.getElementById("crypto-status")
   if (!statusEl) return false
   
@@ -35,25 +55,19 @@ async function checkLocalCryptoService() {
   statusEl.className = "muted"
   
   try {
-    const result = await LocalCrypto.checkService()
-    if (result.available) {
-      statusEl.textContent = "✓ 本地加密服务已连接"
-      statusEl.className = "badge ok"
-      return true
-    } else {
-      statusEl.textContent = "✗ 本地加密服务未启动"
-      statusEl.className = "badge danger"
-      return false
-    }
+    await TransportCrypto.ensureSession()
+    statusEl.textContent = "✓ TLS传输加密已建立"
+    statusEl.className = "badge ok"
+    return true
   } catch (e) {
-    statusEl.textContent = "✗ 无法连接本地加密服务"
+    statusEl.textContent = "✗ TLS传输加密不可用"
     statusEl.className = "badge danger"
     return false
   }
 }
 
 async function refreshList() {
-  const rows = await apiFetch("/api/files", { method: "GET" })
+  const rows = await TransportCrypto.fetch("/api/files", { method: "GET" })
   const tbody = document.querySelector("#tbl tbody")
   tbody.innerHTML = ""
   document.getElementById("empty").style.display = rows.length ? "none" : "block"
@@ -68,16 +82,47 @@ async function refreshList() {
     const downloadBtn = document.createElement("button")
     downloadBtn.className = "btn"
     downloadBtn.textContent = "下载"
-    downloadBtn.onclick = () => onDownload(r.id, r.originalName, r.wrappedKey, r.policy)
+    downloadBtn.onclick = () => onDownload(r.id)
     tr.children[4].appendChild(downloadBtn)
     
     tbody.appendChild(tr)
   }
 }
 
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const base64 = (reader.result || "").toString().split(",")[1] || ""
+      resolve(base64)
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
+function base64ToBlob(base64, contentType) {
+  const bin = atob(base64 || "")
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return new Blob([bytes], { type: contentType || "application/octet-stream" })
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = filename || "download.bin"
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
 async function onUpload() {
   const fileInput = document.getElementById("file")
-  const policy = document.getElementById("policy").value || "role:user"
+  let policy = document.getElementById("policy").value || "role:user"
+  const targetPersonNo = (document.getElementById("target-person-no")?.value || "").trim()
   const btn = document.getElementById("btn-upload")
   const out = document.getElementById("upload-result")
   
@@ -87,50 +132,44 @@ async function onUpload() {
   }
   
   const me = await loadMe()
-  console.log("用户信息:", me)
-  console.log("角色类型:", typeof me?.role, "角色值:", me?.role)
   if (!me || me.role !== "admin") {
     showToast("权限不足", "只有管理员可以上传文件，当前角色: " + (me ? me.role : "未登录"), "danger")
     return
   }
+  if (!targetPersonNo) {
+    showToast("缺少归属工号", "请填写要分配下载权限的工号", "danger")
+    return
+  }
+  if (!policy.includes("personNo:")) {
+    policy = `${policy} personNo:${targetPersonNo}`.trim()
+  }
   
   await initCsrf()
-  
-  const serviceAvailable = await checkLocalCryptoService()
-  if (!serviceAvailable) {
-    showToast("服务未就绪", "请先启动本地加密服务 (运行 start.bat)", "danger")
+  const ready = await checkTransportCrypto()
+  if (!ready) {
+    showToast("传输异常", "TLS传输加密未建立，请刷新后重试", "danger")
     return
   }
   
   btn.disabled = true
-  out.textContent = "正在加密..."
+  out.textContent = "准备上传..."
   
   try {
     const file = fileInput.files[0]
     out.textContent = "正在读取文件..."
-    const fileBase64 = await LocalCrypto.fileToBase64(file)
-    
-    out.textContent = "正在加密..."
-    const encryptResult = await LocalCrypto.encrypt(fileBase64, policy)
-    
-    if (encryptResult.code !== 200) {
-      throw new Error(encryptResult.message || "加密失败")
-    }
-    
-    out.textContent = "正在上传密文..."
+    const fileBase64 = await fileToBase64(file)
+    out.textContent = "正在上传..."
     const uploadData = {
-      encryptedData: encryptResult.encryptedData,
-      wrappedKey: encryptResult.wrappedKey,
+      encryptedData: fileBase64,
+      wrappedKey: "",
       originalName: file.name,
       contentType: file.type || "application/octet-stream",
       sizeBytes: file.size,
-      policy: policy
+      policy: policy,
+      personNo: targetPersonNo
     }
     
-    console.log("CSRF Token:", window.__csrf)
-    console.log("Upload data:", uploadData)
-    
-    const resp = await apiFetch("/api/files/encrypted", {
+    const resp = await TransportCrypto.fetch("/api/files/encrypted", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(uploadData)
@@ -142,6 +181,8 @@ async function onUpload() {
     out.querySelector("b").textContent = resp.id
     out.querySelector("span").textContent = resp.policy || "-"
     fileInput.value = ""
+    const targetInput = document.getElementById("target-person-no")
+    if (targetInput) targetInput.value = ""
     await refreshList()
   } catch (e) {
     showToast("上传失败", e.message, "danger")
@@ -151,41 +192,22 @@ async function onUpload() {
   }
 }
 
-async function onDownload(fileId, originalName, wrappedKey, policy) {
-  const serviceAvailable = await checkLocalCryptoService()
-  if (!serviceAvailable) {
-    showToast("服务未就绪", "请先启动本地加密服务", "danger")
-    return
-  }
-  
+async function onDownload(fileId) {
   try {
-    showToast("下载中", "正在获取密文...", "info")
-    
-    const resp = await apiFetch(`/api/files/${fileId}/encrypted`, { method: "GET" })
-    
-    showToast("解密中", "正在解密文件...", "info")
-    
-    const decryptResult = await LocalCrypto.decrypt(
-      resp.encryptedData,
-      resp.wrappedKey || wrappedKey,
-      resp.policy || policy
-    )
-    
-    if (decryptResult.code !== 200) {
-      throw new Error(decryptResult.message || "解密失败")
-    }
-    
-    const blob = LocalCrypto.base64ToBlob(decryptResult.decryptedData, resp.contentType)
-    LocalCrypto.downloadBlob(blob, originalName || "download.bin")
-    
-    showToast("下载完成", "文件已解密并保存", "success")
+    await checkTransportCrypto()
+    showToast("下载中", "正在获取数据...", "info")
+    const resp = await TransportCrypto.fetch(`/api/files/${fileId}/payload`, { method: "GET" })
+    const blob = base64ToBlob(resp.dataBase64, resp.contentType)
+    downloadBlob(blob, resp.originalName || "download.bin")
+    showToast("下载完成", "文件已保存", "success")
   } catch (e) {
     showToast("下载失败", e.message, "danger")
   }
 }
 
 async function onLogout() {
-  const btn = document.getElementById("btn-logout")
+  const btn = document.getElementById("btn-logout-sidebar")
+  if (!btn) return
   btn.disabled = true
   try {
     await apiFetch("/api/auth/logout", { method: "POST" })
@@ -223,13 +245,22 @@ async function main() {
   const me = await ensureMe()
   if (!me) return
   
-  await checkLocalCryptoService()
+  await checkTransportCrypto()
   
   if (me.role === "admin") {
-    document.getElementById("btn-upload").addEventListener("click", onUpload)
+    const btnUpload = document.getElementById("btn-upload")
+    if (btnUpload) {
+      btnUpload.addEventListener("click", onUpload)
+    }
   }
-  document.getElementById("btn-save-dept").addEventListener("click", onSaveDept)
-  document.getElementById("btn-logout").addEventListener("click", onLogout)
+  const btnSaveDept = document.getElementById("btn-save-dept")
+  if (btnSaveDept) {
+    btnSaveDept.addEventListener("click", onSaveDept)
+  }
+  const btnLogoutSidebar = document.getElementById("btn-logout-sidebar")
+  if (btnLogoutSidebar) {
+    btnLogoutSidebar.addEventListener("click", onLogout)
+  }
   await refreshList()
 }
 

@@ -4,6 +4,9 @@ import com.qar.securitysystem.security.SessionAuthFilter;
 import com.qar.securitysystem.security.AuditLogFilter;
 import com.qar.securitysystem.service.AuditLogService;
 import com.qar.securitysystem.service.SessionService;
+import com.qar.securitysystem.transport.TransportCryptoFilter;
+import com.qar.securitysystem.transport.TransportSessionService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -36,7 +39,12 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, SessionAuthFilter sessionAuthFilter, AuditLogFilter auditLogFilter) throws Exception {
+    public TransportCryptoFilter transportCryptoFilter(TransportSessionService transportSessionService, ObjectMapper objectMapper) {
+        return new TransportCryptoFilter(transportSessionService, objectMapper);
+    }
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, SessionAuthFilter sessionAuthFilter, TransportCryptoFilter transportCryptoFilter, AuditLogFilter auditLogFilter) throws Exception {
         CookieCsrfTokenRepository csrfRepo = CookieCsrfTokenRepository.withHttpOnlyFalse();
         csrfRepo.setCookiePath("/");
 
@@ -58,7 +66,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/", "/auth", "/h2/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/workbench", "/workbench.html").authenticated()
                         .requestMatchers(HttpMethod.GET, "/feedback", "/feedback.html").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/admin", "/admin.html").hasAuthority("ROLE_ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/admin", "/admin.html", "/admin-data.html", "/admin-flight.html", "/admin-qar.html").hasAuthority("ROLE_ADMIN")
                         .requestMatchers(HttpMethod.GET, "/auth.html").permitAll()
                         .requestMatchers(HttpMethod.GET, "/assets/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/csrf").permitAll()
@@ -71,6 +79,7 @@ public class SecurityConfig {
                         .anyRequest().permitAll()
                 )
                 .addFilterBefore(sessionAuthFilter, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(transportCryptoFilter, SessionAuthFilter.class)
                 .addFilterAfter(auditLogFilter, SessionAuthFilter.class)
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(authenticationEntryPoint())

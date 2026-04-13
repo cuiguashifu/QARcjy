@@ -9,7 +9,18 @@ async function ensureAdmin() {
     location.href = "/workbench"
     return null
   }
-  document.getElementById("me-pill").textContent = me.emailOrUsername + " · " + me.role
+  const mePill = document.getElementById("me-pill")
+  if (mePill) {
+    mePill.textContent = me.emailOrUsername + " · " + me.role
+  }
+  const mePillSidebar = document.getElementById("me-pill-sidebar")
+  if (mePillSidebar) {
+    mePillSidebar.textContent = me.emailOrUsername + " · " + me.role
+  }
+  // 重新初始化侧边栏菜单，确保管理后台菜单的展开/收起功能正常工作
+  if (window.jQuery && jQuery.fn.sidebarMenu) {
+    jQuery('.sidebar-menu').sidebarMenu();
+  }
   return me
 }
 
@@ -213,7 +224,8 @@ async function onExport() {
 }
 
 async function onLogout() {
-  const btn = document.getElementById("btn-logout")
+  const btn = document.getElementById("btn-logout-sidebar")
+  if (!btn) return
   btn.disabled = true
   try {
     await apiFetch("/api/auth/logout", { method: "POST" })
@@ -228,11 +240,28 @@ async function onLogout() {
 async function main() {
   const me = await ensureAdmin()
   if (!me) return
-  document.getElementById("btn-export").addEventListener("click", onExport)
-  document.getElementById("btn-logout").addEventListener("click", onLogout)
-  document.getElementById("btn-refresh-feedback").addEventListener("click", refreshFeedback)
-  document.getElementById("btn-refresh-requests").addEventListener("click", refreshRequests)
-  document.getElementById("btn-refresh-logs").addEventListener("click", refreshLogs)
+  
+  const btnExport = document.getElementById("btn-export")
+  if (btnExport) {
+    btnExport.addEventListener("click", onExport)
+  }
+  const btnLogout = document.getElementById("btn-logout-sidebar")
+  if (btnLogout) {
+    btnLogout.addEventListener("click", onLogout)
+  }
+  const btnRefreshFeedback = document.getElementById("btn-refresh-feedback")
+  if (btnRefreshFeedback) {
+    btnRefreshFeedback.addEventListener("click", refreshFeedback)
+  }
+  const btnRefreshRequests = document.getElementById("btn-refresh-requests")
+  if (btnRefreshRequests) {
+    btnRefreshRequests.addEventListener("click", refreshRequests)
+  }
+  const btnRefreshLogs = document.getElementById("btn-refresh-logs")
+  if (btnRefreshLogs) {
+    btnRefreshLogs.addEventListener("click", refreshLogs)
+  }
+  
   await refreshUsers()
   await refreshRequests()
   await refreshFiles()

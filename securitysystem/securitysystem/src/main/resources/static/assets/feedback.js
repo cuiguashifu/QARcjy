@@ -17,9 +17,27 @@ async function ensureMe() {
     location.href = "/auth"
     return null
   }
-  document.getElementById("me-pill").textContent = me.emailOrUsername + " · " + me.role
+  const mePill = document.getElementById("me-pill")
+  if (mePill) {
+    mePill.textContent = me.emailOrUsername + " · " + me.role
+  }
+  const mePillSidebar = document.getElementById("me-pill-sidebar")
+  if (mePillSidebar) {
+    mePillSidebar.textContent = me.emailOrUsername + " · " + me.role
+  }
   if (me.role === "admin") {
-    document.getElementById("admin-link").style.display = "inline"
+    const adminLink = document.getElementById("admin-link")
+    if (adminLink) {
+      adminLink.style.display = "inline"
+    }
+    const adminDataLink = document.getElementById("admin-data-link")
+    if (adminDataLink) {
+      adminDataLink.style.display = "inline"
+    }
+    const adminMenu = document.getElementById("admin-menu")
+    if (adminMenu) {
+      adminMenu.style.display = "block"
+    }
   }
   return me
 }
@@ -79,7 +97,8 @@ async function onSubmit() {
 }
 
 async function onLogout() {
-  const btn = document.getElementById("btn-logout")
+  const btn = document.getElementById("btn-logout-sidebar")
+  if (!btn) return
   btn.disabled = true
   try {
     await apiFetch("/api/auth/logout", { method: "POST" })
@@ -122,12 +141,19 @@ async function onCopyEnv() {
 async function main() {
   const me = await ensureMe()
   if (!me) return
-  fillFromQueryOrLast()
+  
   document.getElementById("btn-submit").addEventListener("click", onSubmit)
-  document.getElementById("btn-logout").addEventListener("click", onLogout)
-  document.getElementById("btn-refresh").addEventListener("click", refreshList)
-  document.getElementById("btn-fill-last").addEventListener("click", onFillLast)
+  document.getElementById("btn-fill-last").addEventListener("click", fillFromQueryOrLast)
   document.getElementById("btn-copy-env").addEventListener("click", onCopyEnv)
+  document.getElementById("btn-refresh").addEventListener("click", refreshList)
+  const btnLogout = document.getElementById("btn-logout")
+  if (btnLogout) {
+    btnLogout.addEventListener("click", onLogout)
+  }
+  const btnLogoutSidebar = document.getElementById("btn-logout-sidebar")
+  if (btnLogoutSidebar) {
+    btnLogoutSidebar.addEventListener("click", onLogout)
+  }
   await refreshList()
 }
 

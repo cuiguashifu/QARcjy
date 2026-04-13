@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>QAR 表格管理 - QAR 安全系统</title>
+    <script>
+      location.replace("/admin-flight.html")
+    </script>
+    <link rel="stylesheet" href="/assets/app.css" />
+    <script src="/assets/meteor.js"></script>
+  </head>  <style>
+      .table th.sortable { cursor: pointer; user-select: none; position: relative; padding-right: 20px; }
+      .table th.sortable:after { content: '↕'; position: absolute; right: 4px; opacity: 0.3; }
+      .table th.sortable.asc:after { content: '↑'; opacity: 1; }
+      .table th.sortable.desc:after { content: '↓'; opacity: 1; }
+      .row-input { width: 100%; min-height: 120px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    </style>
+  </head>
+  <body>
+    <div class="nav">
+      <div class="nav-inner">
+        <div class="brand">QAR 安全系统</div>
+        <a class="link" href="/workbench">工作台</a>
+        <a class="link" href="/feedback">反馈与联系</a>
+        <a class="link" href="/admin">管理后台</a>
+        <a class="link" href="/admin-data.html">数据管理</a>
+        <a class="link active" href="/admin-qar.html">QAR表格</a>
+        <div class="spacer"></div>
+        <div class="pill" id="me-pill">-</div>
+        <button class="btn" id="btn-logout">退出</button>
+      </div>
+    </div>
+
+    <div class="container">
+      <div class="card" style="margin-bottom: 16px;">
+        <div class="card-h">
+          <div class="row" style="justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px">
+            <div>
+              <div class="h2">QAR 表格数据</div>
+              <div class="muted">展示与管理数据库中的QAR表格数据（可上传xlsx预览/导入）</div>
+            </div>
+            <div class="row" style="gap:8px;flex-wrap:wrap">
+              <button class="btn" id="btn-refresh">刷新</button>
+              <input class="input" type="file" id="xlsx-file" accept=".xlsx" style="width:260px" />
+              <button class="btn" id="btn-preview">预览xlsx</button>
+              <button class="btn primary" id="btn-import">导入xlsx</button>
+            </div>
+          </div>
+        </div>
+        <div class="card-b">
+          <div class="row" style="gap:12px;align-items:flex-start;flex-wrap:wrap">
+            <div style="flex:1;min-width:320px">
+              <div class="label">新增/写入一行（JSON）</div>
+              <textarea class="input row-input" id="row-json" placeholder='{"列1":"值","列2":123}'></textarea>
+              <div class="row" style="gap:8px;margin-top:8px">
+                <input class="input" id="row-id" placeholder="可选：填写ID则写入更新，否则新增" style="width:280px" />
+                <button class="btn primary" id="btn-save-row">保存</button>
+              </div>
+            </div>
+            <div style="flex:1;min-width:320px">
+              <div class="label">xlsx 预览</div>
+              <div class="muted" id="preview-info">未选择文件</div>
+              <div style="overflow:auto;max-height:220px;border:1px solid var(--border);border-radius:10px;margin-top:8px">
+                <table class="table" id="preview-table">
+                  <thead></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h">
+          <div class="row" style="justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px">
+            <div>
+              <div class="h2">数据库数据</div>
+              <div class="muted">点击表头排序；数据来自qar_table_rows</div>
+            </div>
+          </div>
+        </div>
+        <div class="card-b">
+          <div style="overflow:auto">
+            <table class="table" id="qar-table">
+              <thead></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div id="empty-msg" class="muted" style="display:none; text-align:center; padding: 20px;">暂无数据</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast">
+      <div class="t">提示</div>
+      <div class="m"></div>
+    </div>
+
+    <script src="/assets/common.js"></script>
+    <script src="/assets/transport.js"></script>
+    <script src="/assets/admin-qar.js"></script>
+  </body>
+</html>

@@ -3,6 +3,7 @@ package com.qar.securitysystem.service;
 import com.qar.securitysystem.config.AdminProperties;
 import com.qar.securitysystem.dto.LoginRequest;
 import com.qar.securitysystem.dto.RegisterRequest;
+import com.qar.securitysystem.dto.RegistrationResult;
 import com.qar.securitysystem.model.AccountRequestEntity;
 import com.qar.securitysystem.model.AccountRequestStatus;
 import com.qar.securitysystem.model.PersonRecordEntity;
@@ -12,9 +13,11 @@ import com.qar.securitysystem.repo.AccountRequestRepository;
 import com.qar.securitysystem.repo.PersonRecordRepository;
 import com.qar.securitysystem.repo.UserRepository;
 import com.qar.securitysystem.util.IdUtil;
+import com.qar.securitysystem.util.RSAUtil;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.security.KeyPair;
 import java.time.Instant;
 
 @Service
@@ -33,7 +36,7 @@ public class AuthService {
         this.accountRequestRepository = accountRequestRepository;
     }
 
-    public AccountRequestEntity submitAccountRequest(RegisterRequest req) {
+    public RegistrationResult submitAccountRequest(RegisterRequest req) {
         String personNo = normalize(req.getEmailOrUsername());
         if (personNo.isBlank()) {
             throw new IllegalArgumentException("emailOrUsername_required");
@@ -101,6 +104,11 @@ public class AuthService {
             throw new IllegalArgumentException("profile_mismatch");
         }
 
+        // Generate RSA Key Pair
+        KeyPair keyPair = RSAUtil.generateKeyPair();
+        String pub = RSAUtil.encodeKey(keyPair.getPublic().getEncoded());
+        String priv = RSAUtil.encodeKey(keyPair.getPrivate().getEncoded());
+
         AccountRequestEntity e = new AccountRequestEntity();
         e.setId(IdUtil.newId());
         e.setPersonNo(personNo);
@@ -113,7 +121,8 @@ public class AuthService {
         e.setPasswordHash(passwordEncoder.encode(req.getPassword()));
         e.setStatus(AccountRequestStatus.PENDING);
         e.setCreatedAt(Instant.now());
-        return accountRequestRepository.save(e);
+        e.setPublicKey(pub);
+        return new RegistrationResult(accountRequestRepository.save(e), priv);
     }
 
     public UserEntity authenticate(LoginRequest req) {

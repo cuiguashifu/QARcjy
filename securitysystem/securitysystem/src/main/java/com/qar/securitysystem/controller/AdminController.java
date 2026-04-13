@@ -13,11 +13,13 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -46,12 +48,50 @@ public class AdminController {
 
     @GetMapping("/persons")
     public ResponseEntity<?> persons() {
-        return ResponseEntity.ok(personRecordRepository.findAll());
+        return ResponseEntity.ok(adminService.listAllPersons());
+    }
+
+    @PostMapping("/persons")
+    public ResponseEntity<?> createPerson(@RequestBody PersonRecordEntity person) {
+        try {
+            return ResponseEntity.ok(adminService.createPerson(person));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("code", 400, "message", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/persons/{id}")
+    public ResponseEntity<?> updatePerson(@PathVariable("id") String id, @RequestBody PersonRecordEntity person) {
+        try {
+            return ResponseEntity.ok(adminService.updatePerson(id, person));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("code", 400, "message", e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/persons/{id}")
+    public ResponseEntity<?> deletePerson(@PathVariable("id") String id) {
+        try {
+            adminService.deletePerson(id);
+            return ResponseEntity.ok(java.util.Map.of("code", 200, "message", "ok"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("code", 400, "message", e.getMessage()));
+        }
     }
 
     @GetMapping("/files")
     public ResponseEntity<?> files() {
         return ResponseEntity.ok(adminService.listAllFiles());
+    }
+
+    @DeleteMapping("/files/{id}")
+    public ResponseEntity<?> deleteFile(@PathVariable("id") String id) {
+        try {
+            adminService.deleteFile(id);
+            return ResponseEntity.ok(java.util.Map.of("code", 200, "message", "ok"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("code", 400, "message", e.getMessage()));
+        }
     }
 
     @GetMapping("/files/export")

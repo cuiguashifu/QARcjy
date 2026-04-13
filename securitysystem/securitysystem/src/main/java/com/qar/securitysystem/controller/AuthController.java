@@ -4,6 +4,7 @@ import com.qar.securitysystem.config.AppSecurityProperties;
 import com.qar.securitysystem.dto.AccountRequestResponse;
 import com.qar.securitysystem.dto.LoginRequest;
 import com.qar.securitysystem.dto.RegisterRequest;
+import com.qar.securitysystem.dto.RegistrationResult;
 import com.qar.securitysystem.dto.UserResponse;
 import com.qar.securitysystem.model.AccountRequestEntity;
 import com.qar.securitysystem.model.UserEntity;
@@ -44,8 +45,10 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest req) {
         try {
-            AccountRequestEntity e = authService.submitAccountRequest(req);
-            return ResponseEntity.ok(toAccountRequestResponse(e));
+            RegistrationResult result = authService.submitAccountRequest(req);
+            AccountRequestResponse resp = toAccountRequestResponse(result.getEntity());
+            resp.setPrivateKey(result.getPrivateKey());
+            return ResponseEntity.ok(resp);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(error(400, e.getMessage()));
         }

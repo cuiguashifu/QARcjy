@@ -107,6 +107,7 @@ public class AdminService {
         u.setPersonId(pr.getId());
         u.setRole(UserRole.USER);
         u.setCreatedAt(Instant.now());
+        u.setPublicKey(e.getPublicKey());
         userRepository.save(u);
 
         e.setStatus(AccountRequestStatus.APPROVED);
@@ -132,6 +133,47 @@ public class AdminService {
 
     public List<AuditLogResponse> listAuditLogs() {
         return auditLogRepository.findTop200ByOrderByCreatedAtDesc().stream().map(this::toAuditLogResponse).toList();
+    }
+
+    public List<PersonRecordEntity> listAllPersons() {
+        return personRecordRepository.findAll();
+    }
+
+    public PersonRecordEntity createPerson(PersonRecordEntity person) {
+        if (person.getPersonNo() == null || person.getPersonNo().isBlank()) {
+            throw new IllegalArgumentException("person_no_required");
+        }
+        if (personRecordRepository.existsByPersonNo(person.getPersonNo())) {
+            throw new IllegalArgumentException("person_no_already_exists");
+        }
+        person.setId(IdUtil.newId());
+        person.setCreatedAt(Instant.now());
+        return personRecordRepository.save(person);
+    }
+
+    public PersonRecordEntity updatePerson(String id, PersonRecordEntity person) {
+        PersonRecordEntity existing = personRecordRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("not_found"));
+        if (person.getFullName() != null) existing.setFullName(person.getFullName());
+        if (person.getPhone() != null) existing.setPhone(person.getPhone());
+        if (person.getDepartment() != null) existing.setDepartment(person.getDepartment());
+        if (person.getAirline() != null) existing.setAirline(person.getAirline());
+        if (person.getPositionTitle() != null) existing.setPositionTitle(person.getPositionTitle());
+        if (person.getIdLast4() != null) existing.setIdLast4(person.getIdLast4());
+        return personRecordRepository.save(existing);
+    }
+
+    public void deletePerson(String id) {
+        if (!personRecordRepository.existsById(id)) {
+            throw new IllegalArgumentException("not_found");
+        }
+        personRecordRepository.deleteById(id);
+    }
+
+    public void deleteFile(String id) {
+        if (!fileRecordRepository.existsById(id)) {
+            throw new IllegalArgumentException("not_found");
+        }
+        fileRecordRepository.deleteById(id);
     }
 
     private UserResponse toUserResponse(UserEntity u) {
