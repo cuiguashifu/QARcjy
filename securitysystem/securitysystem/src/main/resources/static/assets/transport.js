@@ -33,45 +33,54 @@
   const state = {
     protocol: "tls",
     suite: "TLS_AES_256_GCM_SHA256",
-    sessionId: null,
-    aesKey: null,
-    rsa: null,
-    expiresAt: null
+    serverPublicKey: null
+  }
+
+  function resetSession() {
+    state.serverPublicKey = null
+  }
+
+  function shouldRetryTransport(rawMessage) {
+    const msg = (rawMessage || "").toString().trim()
+    return msg === "request_failed"
+      || msg === "transport_wrapped_key_required"
+      || msg === "transport_session_invalid"
+      || msg === "unsupported_transport"
   }
 
   async function ensureSession() {
-    if (state.sessionId && state.aesKey) return
-    if (!state.rsa) state.rsa = await genRsa()
-    const spki = await crypto.subtle.exportKey("spki", state.rsa.publicKey)
+    if (state.serverPublicKey) return
     const handshake = await apiFetch("/api/transport/handshake", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clientPublicKey: bufToB64(spki), protocol: state.protocol })
+      body: JSON.stringify({ protocol: state.protocol })
     })
-    const wrappedKeyBuf = b64ToBuf(handshake.wrappedKey)
-    const rawAes = await crypto.subtle.decrypt({ name: "RSA-OAEP" }, state.rsa.privateKey, wrappedKeyBuf)
-    state.aesKey = await crypto.subtle.importKey("raw", rawAes, { name: "AES-GCM" }, false, ["encrypt", "decrypt"])
-    state.sessionId = handshake.sessionId
-    state.expiresAt = handshake.expiresAt
+    state.serverPublicKey = await crypto.subtle.importKey(
+      "spki",
+      b64ToBuf(handshake.serverPublicKey),
+      { name: "RSA-OAEP", hash: "SHA-256" },
+      false,
+      ["encrypt"]
+    )
   }
 
-  async function encryptBody(method, path, bodyStr) {
+  async function encryptBody(method, path, bodyStr, aesKey) {
     const iv = crypto.getRandomValues(new Uint8Array(12))
     const aad = aadFor(method, path)
     const pt = enc.encode(bodyStr || "")
-    const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: aad }, state.aesKey, pt)
+    const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: aad }, aesKey, pt)
     return { iv: bufToB64(iv.buffer), ciphertext: bufToB64(ct) }
   }
 
-  async function decryptBody(method, path, envelope) {
+  async function decryptBody(method, path, envelope, aesKey) {
     const iv = new Uint8Array(b64ToBuf(envelope.iv))
     const ct = b64ToBuf(envelope.ciphertext)
     const aad = aadFor(method, path)
-    const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv, additionalData: aad }, state.aesKey, ct)
+    const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv, additionalData: aad }, aesKey, ct)
     return dec.decode(pt || new ArrayBuffer(0))
   }
 
-  async function fetchEncrypted(path, opts) {
+  async function fetchEncrypted(path, opts, allowRetry = true) {
     await ensureSession()
     const method = (opts && opts.method ? opts.method : "GET").toUpperCase()
     const headers = Object.assign({ "Accept": "application/json" }, (opts && opts.headers) ? opts.headers : {})
@@ -79,7 +88,15 @@
     if (csrf && csrf.headerName && csrf.token) headers[csrf.headerName] = csrf.token
     headers["X-QAR-Encrypted"] = "1"
     headers["X-QAR-Transport"] = state.protocol
-    headers["X-QAR-Session"] = state.sessionId
+
+    const aesKey = await crypto.subtle.generateKey(
+      { name: "AES-GCM", length: 256 },
+      true,
+      ["encrypt", "decrypt"]
+    )
+    const rawAes = await crypto.subtle.exportKey("raw", aesKey)
+    const wrappedKey = await crypto.subtle.encrypt({ name: "RSA-OAEP" }, state.serverPublicKey, rawAes)
+    headers["X-QAR-Wrapped-Key"] = bufToB64(wrappedKey)
 
     let body = opts && opts.body ? opts.body : null
     let init = Object.assign({}, opts || {}, { credentials: "include", method, headers })
@@ -87,33 +104,45 @@
     if (body != null && typeof body !== "string") body = JSON.stringify(body)
     if (body != null) {
       headers["Content-Type"] = "application/json"
-      const env = await encryptBody(method, path, body)
+      const env = await encryptBody(method, path, body, aesKey)
       init.body = JSON.stringify(env)
     } else {
       delete init.body
     }
 
-    const res = await fetch(path, init)
-    const ct = (res.headers.get("content-type") || "").toLowerCase()
-    let data = null
-    if (ct.includes("application/json")) {
-      const env = await res.json().catch(() => null)
-      if (env && env.iv && env.ciphertext) {
-        const plain = await decryptBody(method, path, env)
-        data = plain ? JSON.parse(plain) : null
+    try {
+      const res = await fetch(path, init)
+      const ct = (res.headers.get("content-type") || "").toLowerCase()
+      let data = null
+      if (ct.includes("application/json")) {
+        const env = await res.json().catch(() => null)
+        if (env && env.iv && env.ciphertext) {
+          const plain = await decryptBody(method, path, env, aesKey)
+          data = plain ? JSON.parse(plain) : null
+        } else {
+          data = env
+        }
       } else {
-        data = env
+        const txtEnv = await res.text().catch(() => "")
+        data = txtEnv
       }
-    } else {
-      const txtEnv = await res.text().catch(() => "")
-      data = txtEnv
-    }
 
-    if (!res.ok) {
-      const msg = data && data.message ? data.message : (typeof data === "string" ? data : "request_failed")
-      throw new Error(mapErrorMessage(msg))
+      if (!res.ok) {
+        const msg = data && data.message ? data.message : (typeof data === "string" ? data : "request_failed")
+        if (allowRetry && shouldRetryTransport(msg)) {
+          resetSession()
+          return await fetchEncrypted(path, opts, false)
+        }
+        throw new Error(mapErrorMessage(msg))
+      }
+      return data
+    } catch (e) {
+      if (allowRetry && shouldRetryTransport(e && e.message)) {
+        resetSession()
+        return await fetchEncrypted(path, opts, false)
+      }
+      throw e
     }
-    return data
   }
 
   window.TransportCrypto = {

@@ -20,7 +20,7 @@ import java.util.Base64;
 
 public class TransportCryptoFilter extends OncePerRequestFilter {
     public static final String HEADER_TRANSPORT = "X-QAR-Transport";
-    public static final String HEADER_SESSION = "X-QAR-Session";
+    public static final String HEADER_WRAPPED_KEY = "X-QAR-Wrapped-Key";
     public static final String HEADER_ENCRYPTED = "X-QAR-Encrypted";
     public static final String HEADER_ENCRYPTED_RESPONSE = "X-QAR-Encrypted-Response";
 
@@ -60,12 +60,12 @@ public class TransportCryptoFilter extends OncePerRequestFilter {
             return;
         }
 
-        String sessionId = normalize(request.getHeader(HEADER_SESSION));
-        TransportSessionService.Session session = sessionService.getSessionOrNull(sessionId);
-        if (session == null) {
-            writeError(response, 401, "transport_session_invalid");
+        String wrappedKey = request.getHeader(HEADER_WRAPPED_KEY);
+        if (wrappedKey == null || wrappedKey.isBlank()) {
+            writeError(response, 401, "transport_wrapped_key_required");
             return;
         }
+        javax.crypto.spec.SecretKeySpec aesKey = sessionService.unwrapTransportKey(wrappedKey);
 
         byte[] aad = buildAad(request);
         HttpServletRequest reqToUse = request;
@@ -74,7 +74,7 @@ public class TransportCryptoFilter extends OncePerRequestFilter {
             TransportEnvelope env = objectMapper.readValue(raw, TransportEnvelope.class);
             byte[] iv = Base64.getDecoder().decode(env.getIv());
             byte[] ciphertext = Base64.getDecoder().decode(env.getCiphertext());
-            byte[] plaintext = AesGcmUtil.decrypt(session.getAesKey(), iv, ciphertext, aad);
+            byte[] plaintext = AesGcmUtil.decrypt(aesKey, iv, ciphertext, aad);
             reqToUse = new CachedBodyRequest(request, plaintext);
         }
 
@@ -84,7 +84,7 @@ public class TransportCryptoFilter extends OncePerRequestFilter {
         byte[] respBody = wrappedResp.getContentAsByteArray();
         byte[] iv = new byte[12];
         secureRandom.nextBytes(iv);
-        byte[] ciphertext = AesGcmUtil.encrypt(session.getAesKey(), iv, respBody == null ? new byte[0] : respBody, aad);
+        byte[] ciphertext = AesGcmUtil.encrypt(aesKey, iv, respBody == null ? new byte[0] : respBody, aad);
 
         TransportEnvelope out = new TransportEnvelope();
         out.setIv(Base64.getEncoder().encodeToString(iv));

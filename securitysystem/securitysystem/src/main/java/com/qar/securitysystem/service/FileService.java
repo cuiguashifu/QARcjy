@@ -1,7 +1,5 @@
 package com.qar.securitysystem.service;
 
-import com.qar.securitysystem.controller.DecryptController;
-import com.qar.securitysystem.controller.EncryptController;
 import com.qar.securitysystem.dto.EncryptedFileResponse;
 import com.qar.securitysystem.dto.EncryptedFileUploadRequest;
 import com.qar.securitysystem.dto.FileRecordResponse;
@@ -9,36 +7,31 @@ import com.qar.securitysystem.model.FileRecordEntity;
 import com.qar.securitysystem.model.UserEntity;
 import com.qar.securitysystem.repo.FileRecordRepository;
 import com.qar.securitysystem.repo.UserRepository;
+import com.qar.securitysystem.util.AesGcmUtil;
 import com.qar.securitysystem.util.IdUtil;
-import com.qar.securitysystem.util.RSAUtil;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.crypto.KeyGenerator;
-import javax.crypto.SecretKey;
-import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
-import javax.crypto.Cipher;
-import java.security.PublicKey;
-import java.security.SecureRandom;
 import java.time.Instant;
+import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
-import java.nio.charset.StandardCharsets;
 
 @Service
 public class FileService {
+    private static final String LEGACY_PLAIN = "PLAIN_TEXT";
+    private static final int GCM_IV_LENGTH = 12;
+
     private final FileRecordRepository fileRecordRepository;
     private final UserRepository userRepository;
-    private final EncryptController encryptController;
-    private final DecryptController decryptController;
+    private final ServerKeyPairService serverKeyPairService;
 
-    public FileService(FileRecordRepository fileRecordRepository, UserRepository userRepository, EncryptController encryptController, DecryptController decryptController) {
+    public FileService(FileRecordRepository fileRecordRepository, UserRepository userRepository, ServerKeyPairService serverKeyPairService) {
         this.fileRecordRepository = fileRecordRepository;
         this.userRepository = userRepository;
-        this.encryptController = encryptController;
-        this.decryptController = decryptController;
+        this.serverKeyPairService = serverKeyPairService;
     }
 
     public FileRecordResponse uploadAndEncrypt(UserEntity user, MultipartFile file, String policy) {
@@ -49,8 +42,7 @@ public class FileService {
             throw new IllegalArgumentException("file_read_failed", e);
         }
 
-        // Store as plain text on server
-        String plainDataBase64 = Base64.getEncoder().encodeToString(raw);
+        StoredFilePayload stored = encryptForStorage(raw, policy);
 
         FileRecordEntity r = new FileRecordEntity();
         r.setId(IdUtil.newId());
@@ -60,8 +52,8 @@ public class FileService {
         r.setContentType(file.getContentType() == null ? MediaType.APPLICATION_OCTET_STREAM_VALUE : file.getContentType());
         r.setSizeBytes(raw.length);
         r.setPolicy(policy);
-        r.setWrappedKey("PLAIN_TEXT"); // Indicates it's stored as plain text
-        r.setEncryptedData(plainDataBase64); // Actually storing plain text
+        r.setWrappedKey(stored.wrappedKey());
+        r.setEncryptedData(stored.encryptedDataBase64());
         r.setCreatedAt(Instant.now());
 
         fileRecordRepository.save(r);
@@ -69,18 +61,24 @@ public class FileService {
     }
 
     public FileRecordResponse storeEncrypted(UserEntity user, EncryptedFileUploadRequest request) {
-        // Even if the client sends "encrypted" data, we treat it as the data to store.
-        // If the requirement is server stores plain text, we assume the client sends plain text here.
+        byte[] plainData;
+        try {
+            plainData = Base64.getDecoder().decode(request.getEncryptedData());
+        } catch (Exception e) {
+            throw new IllegalArgumentException("invalid_file_payload", e);
+        }
+
+        StoredFilePayload stored = encryptForStorage(plainData, request.getPolicy());
         FileRecordEntity r = new FileRecordEntity();
         r.setId(IdUtil.newId());
         String ownerKey = user.getPersonId() == null || user.getPersonId().isBlank() ? user.getId() : user.getPersonId();
         r.setOwnerId(ownerKey);
         r.setOriginalName(normalizeFilename(request.getOriginalName()));
         r.setContentType(request.getContentType() == null ? MediaType.APPLICATION_OCTET_STREAM_VALUE : request.getContentType());
-        r.setSizeBytes(request.getSizeBytes() != null ? request.getSizeBytes() : 0L);
+        r.setSizeBytes(request.getSizeBytes() != null ? request.getSizeBytes() : (long) plainData.length);
         r.setPolicy(request.getPolicy());
-        r.setWrappedKey("PLAIN_TEXT");
-        r.setEncryptedData(request.getEncryptedData()); // Storing as-is
+        r.setWrappedKey(stored.wrappedKey());
+        r.setEncryptedData(stored.encryptedDataBase64());
         r.setCreatedAt(Instant.now());
 
         fileRecordRepository.save(r);
@@ -100,8 +98,7 @@ public class FileService {
     }
 
     public byte[] decryptForDownload(FileRecordEntity record) {
-        // Since it's stored as plain text, we just decode the base64
-        return Base64.getDecoder().decode(record.getEncryptedData());
+        return decryptStoredData(record);
     }
 
     public EncryptedFileResponse getEncryptedDataForUser(FileRecordEntity record, UserEntity user) {
@@ -109,39 +106,18 @@ public class FileService {
             throw new IllegalStateException("user_public_key_missing");
         }
 
-        byte[] plainData = Base64.getDecoder().decode(record.getEncryptedData());
-        
+        byte[] plainData = decryptStoredData(record);
         try {
-            // 1. Generate random AES key
-            KeyGenerator keyGen = KeyGenerator.getInstance("AES");
-            keyGen.init(256);
-            SecretKey aesKey = keyGen.generateKey();
-            
-            // 2. Generate random IV
-            byte[] iv = new byte[16];
-            new SecureRandom().nextBytes(iv);
-            
-            // 3. Encrypt data with AES-CBC
-            Cipher aesCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-            aesCipher.init(Cipher.ENCRYPT_MODE, aesKey, new IvParameterSpec(iv));
-            byte[] encryptedData = aesCipher.doFinal(plainData);
-            
-            // 4. Combine IV + EncryptedData
-            byte[] ivAndData = new byte[iv.length + encryptedData.length];
-            System.arraycopy(iv, 0, ivAndData, 0, iv.length);
-            System.arraycopy(encryptedData, 0, ivAndData, iv.length, encryptedData.length);
-            
-            // 5. Encrypt AES key with User's RSA Public Key
-            PublicKey pubKey = RSAUtil.getPublicKey(user.getPublicKey());
-            byte[] encryptedAesKey = RSAUtil.encrypt(aesKey.getEncoded(), pubKey);
-            
+            javax.crypto.SecretKey aesKey = AesGcmUtil.generateKey();
+            byte[] iv = AesGcmUtil.newIv();
+            byte[] encryptedData = AesGcmUtil.encrypt(aesKey, iv, plainData, buildFileAad(record.getPolicy()));
+
             EncryptedFileResponse resp = new EncryptedFileResponse();
-            resp.setEncryptedData(Base64.getEncoder().encodeToString(ivAndData));
-            resp.setWrappedKey(Base64.getEncoder().encodeToString(encryptedAesKey));
+            resp.setEncryptedData(Base64.getEncoder().encodeToString(joinIvAndCiphertext(iv, encryptedData)));
+            resp.setWrappedKey(serverKeyPairService.wrapKeyForPublicKey(aesKey.getEncoded(), user.getPublicKey()));
             resp.setOriginalName(record.getOriginalName());
             resp.setContentType(record.getContentType());
             resp.setPolicy(record.getPolicy());
-            
             return resp;
         } catch (Exception e) {
             throw new RuntimeException("failed_to_encrypt_for_transmission", e);
@@ -192,5 +168,51 @@ public class FileService {
         } catch (Exception e) {
         }
         return cleaned;
+    }
+
+    private StoredFilePayload encryptForStorage(byte[] plainData, String policy) {
+        javax.crypto.SecretKey aesKey = AesGcmUtil.generateKey();
+        byte[] iv = AesGcmUtil.newIv();
+        byte[] ciphertext = AesGcmUtil.encrypt(aesKey, iv, plainData, buildFileAad(policy));
+        return new StoredFilePayload(
+                Base64.getEncoder().encodeToString(joinIvAndCiphertext(iv, ciphertext)),
+                serverKeyPairService.wrapKey(aesKey.getEncoded())
+        );
+    }
+
+    private byte[] decryptStoredData(FileRecordEntity record) {
+        if (record == null || record.getEncryptedData() == null || record.getEncryptedData().isBlank()) {
+            return new byte[0];
+        }
+        if (record.getWrappedKey() == null || record.getWrappedKey().isBlank() || LEGACY_PLAIN.equals(record.getWrappedKey())) {
+            return Base64.getDecoder().decode(record.getEncryptedData());
+        }
+
+        byte[] keyBytes = serverKeyPairService.unwrapKey(record.getWrappedKey());
+        SecretKeySpec aesKey = new SecretKeySpec(keyBytes, "AES");
+        byte[] ivAndCiphertext = Base64.getDecoder().decode(record.getEncryptedData());
+        if (ivAndCiphertext.length < GCM_IV_LENGTH) {
+            throw new IllegalArgumentException("invalid_stored_ciphertext");
+        }
+        byte[] iv = new byte[GCM_IV_LENGTH];
+        byte[] ciphertext = new byte[ivAndCiphertext.length - GCM_IV_LENGTH];
+        System.arraycopy(ivAndCiphertext, 0, iv, 0, iv.length);
+        System.arraycopy(ivAndCiphertext, iv.length, ciphertext, 0, ciphertext.length);
+        return AesGcmUtil.decrypt(aesKey, iv, ciphertext, buildFileAad(record.getPolicy()));
+    }
+
+    private static byte[] buildFileAad(String policy) {
+        String safePolicy = policy == null ? "" : policy.trim();
+        return safePolicy.getBytes(StandardCharsets.UTF_8);
+    }
+
+    private static byte[] joinIvAndCiphertext(byte[] iv, byte[] ciphertext) {
+        byte[] combined = new byte[iv.length + ciphertext.length];
+        System.arraycopy(iv, 0, combined, 0, iv.length);
+        System.arraycopy(ciphertext, 0, combined, iv.length, ciphertext.length);
+        return combined;
+    }
+
+    private record StoredFilePayload(String encryptedDataBase64, String wrappedKey) {
     }
 }

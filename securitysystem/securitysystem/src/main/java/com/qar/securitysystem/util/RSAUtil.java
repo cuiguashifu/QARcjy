@@ -1,5 +1,7 @@
 package com.qar.securitysystem.util;
 
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+
 import javax.crypto.Cipher;
 import javax.crypto.spec.OAEPParameterSpec;
 import javax.crypto.spec.PSource;
@@ -9,12 +11,14 @@ import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.Security;
 import java.security.spec.MGF1ParameterSpec;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 
 public class RSAUtil {
+    private static final String PROVIDER = "BC";
     private static final String ALGORITHM = "RSA";
     private static final int KEY_SIZE = 2048;
     private static final String OAEP_SHA256 = "RSA/ECB/OAEPWithSHA-256AndMGF1Padding";
@@ -25,12 +29,18 @@ public class RSAUtil {
             PSource.PSpecified.DEFAULT
     );
 
+    static {
+        if (Security.getProvider(PROVIDER) == null) {
+            Security.addProvider(new BouncyCastleProvider());
+        }
+    }
+
     public static KeyPair generateKeyPair() {
         try {
-            KeyPairGenerator generator = KeyPairGenerator.getInstance(ALGORITHM);
+            KeyPairGenerator generator = KeyPairGenerator.getInstance(ALGORITHM, PROVIDER);
             generator.initialize(KEY_SIZE);
             return generator.generateKeyPair();
-        } catch (NoSuchAlgorithmException e) {
+        } catch (Exception e) {
             throw new RuntimeException("Failed to generate RSA key pair", e);
         }
     }
@@ -46,7 +56,7 @@ public class RSAUtil {
     public static PublicKey getPublicKey(String base64PublicKey) {
         try {
             X509EncodedKeySpec keySpec = new X509EncodedKeySpec(decodeKey(base64PublicKey));
-            KeyFactory keyFactory = KeyFactory.getInstance(ALGORITHM);
+            KeyFactory keyFactory = KeyFactory.getInstance(ALGORITHM, PROVIDER);
             return keyFactory.generatePublic(keySpec);
         } catch (Exception e) {
             throw new RuntimeException("Failed to get public key", e);
@@ -56,7 +66,7 @@ public class RSAUtil {
     public static PrivateKey getPrivateKey(String base64PrivateKey) {
         try {
             PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(decodeKey(base64PrivateKey));
-            KeyFactory keyFactory = KeyFactory.getInstance(ALGORITHM);
+            KeyFactory keyFactory = KeyFactory.getInstance(ALGORITHM, PROVIDER);
             return keyFactory.generatePrivate(keySpec);
         } catch (Exception e) {
             throw new RuntimeException("Failed to get private key", e);
@@ -65,7 +75,7 @@ public class RSAUtil {
 
     public static byte[] encrypt(byte[] data, PublicKey publicKey) {
         try {
-            Cipher cipher = Cipher.getInstance(OAEP_SHA256);
+            Cipher cipher = Cipher.getInstance(OAEP_SHA256, PROVIDER);
             cipher.init(Cipher.ENCRYPT_MODE, publicKey, OAEP_SHA256_SPEC);
             return cipher.doFinal(data);
         } catch (Exception e) {
@@ -75,7 +85,7 @@ public class RSAUtil {
 
     public static byte[] decrypt(byte[] data, PrivateKey privateKey) {
         try {
-            Cipher cipher = Cipher.getInstance(OAEP_SHA256);
+            Cipher cipher = Cipher.getInstance(OAEP_SHA256, PROVIDER);
             cipher.init(Cipher.DECRYPT_MODE, privateKey, OAEP_SHA256_SPEC);
             return cipher.doFinal(data);
         } catch (Exception e) {

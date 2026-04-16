@@ -13,10 +13,10 @@ import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Component;
 
 import java.io.InputStreamReader;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 @Component
 public class PersonSeeder implements ApplicationRunner {
@@ -36,9 +36,22 @@ public class PersonSeeder implements ApplicationRunner {
         if (!props.isSeedEnabled()) {
             return;
         }
-        if (personRecordRepository.count() > 0) {
-            return;
+        seedMissingPersons();
+    }
+
+    public Optional<PersonRecordEntity> ensurePersonLoaded(String personNo) {
+        String normalized = personNo == null ? "" : personNo.trim();
+        if (normalized.isBlank()) {
+            return Optional.empty();
         }
+        Optional<PersonRecordEntity> existing = personRecordRepository.findByPersonNo(normalized);
+        if (existing.isPresent() || !props.isSeedEnabled()) {
+            return existing;
+        }
+        return seedSinglePerson(normalized);
+    }
+
+    private void seedMissingPersons() throws Exception {
         Resource r = resourceLoader.getResource(props.getSeedCsv());
         if (!r.exists()) {
             return;
@@ -81,19 +94,66 @@ public class PersonSeeder implements ApplicationRunner {
             if (personNo.isBlank() || fullName.isBlank() || idLast4.isBlank()) {
                 continue;
             }
-            PersonRecordEntity e = new PersonRecordEntity();
-            e.setId(IdUtil.newId());
-            e.setPersonNo(personNo);
-            e.setFullName(fullName);
-            e.setIdLast4(idLast4);
-            e.setPhone(phone.isBlank() ? null : phone);
-            e.setDepartment(dept.isBlank() ? null : dept);
-            e.setAirline(airline.isBlank() ? null : airline);
-            e.setPositionTitle(positionTitle.isBlank() ? null : positionTitle);
-            e.setCreatedAt(Instant.now());
-            log.info("Saving person: personNo={}, fullName={}, fullName bytes={}", 
-                personNo, fullName, java.util.Arrays.toString(fullName.getBytes(StandardCharsets.UTF_8)));
-            personRecordRepository.save(e);
+            if (personRecordRepository.existsByPersonNo(personNo)) {
+                continue;
+            }
+            savePerson(personNo, fullName, idLast4, phone, dept, airline, positionTitle);
         }
+    }
+
+    private Optional<PersonRecordEntity> seedSinglePerson(String targetPersonNo) {
+        try {
+            Resource r = resourceLoader.getResource(props.getSeedCsv());
+            if (!r.exists()) {
+                return Optional.empty();
+            }
+            String rawContent = new String(r.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            boolean first = true;
+            for (String line : rawContent.lines().toList()) {
+                if (first) {
+                    first = false;
+                    continue;
+                }
+                String v = line.trim();
+                if (v.isBlank()) {
+                    continue;
+                }
+                String[] parts = v.split(",", -1);
+                if (parts.length < 3) {
+                    continue;
+                }
+                String personNo = parts[0].trim();
+                if (!targetPersonNo.equals(personNo)) {
+                    continue;
+                }
+                String fullName = parts[1].trim();
+                String idLast4 = parts[2].trim();
+                String phone = parts.length >= 4 ? parts[3].trim() : "";
+                String dept = parts.length >= 5 ? parts[4].trim() : "";
+                String airline = parts.length >= 6 ? parts[5].trim() : "";
+                String positionTitle = parts.length >= 7 ? parts[6].trim() : "";
+                return Optional.of(savePerson(personNo, fullName, idLast4, phone, dept, airline, positionTitle));
+            }
+            return Optional.empty();
+        } catch (Exception e) {
+            log.warn("Failed to seed person on demand for personNo={}", targetPersonNo, e);
+            return Optional.empty();
+        }
+    }
+
+    private PersonRecordEntity savePerson(String personNo, String fullName, String idLast4, String phone, String dept, String airline, String positionTitle) {
+        PersonRecordEntity e = new PersonRecordEntity();
+        e.setId(IdUtil.newId());
+        e.setPersonNo(personNo);
+        e.setFullName(fullName);
+        e.setIdLast4(idLast4);
+        e.setPhone(phone == null || phone.isBlank() ? null : phone);
+        e.setDepartment(dept == null || dept.isBlank() ? null : dept);
+        e.setAirline(airline == null || airline.isBlank() ? null : airline);
+        e.setPositionTitle(positionTitle == null || positionTitle.isBlank() ? null : positionTitle);
+        e.setCreatedAt(Instant.now());
+        log.info("Saving person: personNo={}, fullName={}, fullName bytes={}",
+                personNo, fullName, java.util.Arrays.toString(fullName.getBytes(StandardCharsets.UTF_8)));
+        return personRecordRepository.save(e);
     }
 }

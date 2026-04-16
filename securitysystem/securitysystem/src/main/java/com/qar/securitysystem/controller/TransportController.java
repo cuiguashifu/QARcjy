@@ -25,13 +25,11 @@ public class TransportController {
             return ResponseEntity.status(401).build();
         }
 
-        TransportSessionService.HandshakeResult r = sessionService.handshake(req == null ? null : req.getClientPublicKey(), req == null ? null : req.getProtocol());
+        TransportSessionService.HandshakeResult r = sessionService.handshake(req == null ? null : req.getProtocol());
         TransportHandshakeResponse resp = new TransportHandshakeResponse();
         resp.setProtocol(r.protocol);
         resp.setSuite(r.suite);
-        resp.setSessionId(r.sessionId);
-        resp.setWrappedKey(r.wrappedKeyBase64);
-        resp.setExpiresAt(r.expiresAt.toString());
+        resp.setServerPublicKey(r.serverPublicKeyBase64);
         return ResponseEntity.ok(resp);
     }
 }

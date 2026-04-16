@@ -30,6 +30,7 @@ public class FileRecordEntity {
     @Column(name = "policy")
     private String policy;
 
+    @Lob
     @Column(name = "wrapped_key")
     private String wrappedKey;
 

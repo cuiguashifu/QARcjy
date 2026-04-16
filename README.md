@@ -1,35 +1,23 @@
 # QAR 安全系统 (QAR Security System)
 
-QAR 安全系统是一个面向航空领域 QAR（快速访问记录器）数据的综合性安全管理平台。系统采用**客户端加密架构**，核心目标是实现明文数据永不上传服务器、高强度数据加密存储、细粒度的基于角色的访问控制（RBAC）以及完整可追溯的审计日志。
+QAR 安全系统是一个面向航空领域 QAR（快速访问记录器）数据的综合性安全管理平台。系统采用**传输层加密架构**，核心目标是实现高强度数据加密存储、细粒度的基于角色的访问控制（RBAC）以及完整可追溯的审计日志。
 
 ***
 
 ## 项目架构
 
-项目由两个核心服务组成，采用**客户端加密 + 服务端存储密文**的混合架构：
+项目基于 **Spring Boot 4.x** 构建的 Web 服务，采用前后端分离架构：
 
-### 1. `securitysystem` (主业务系统)
-
-基于 **Spring Boot 4.x** 构建的 Web 服务，负责核心业务逻辑。
+### 主业务系统 (securitysystem)
 
 - **端口**: `8101`
 - **主要职责**:
   - 用户认证与授权（无状态 Session + HttpOnly Cookie）
   - 管理员后台（人员管理、注册审批、全量文件导出）
-  - 密文文件存储与管理（仅存储加密后的数据）
+  - 文件存储与管理
   - 系统反馈收集与处理
   - 全局 API 审计日志记录
-
-### 2. `local-crypto-service` (本地加密服务)
-
-一个轻量级的独立 Java 服务，在用户本地运行，专职处理高强度的加密运算。
-
-- **端口**: `18234`
-- **主要职责**:
-  - 提供 `/encrypt` 和 `/decrypt` 等 RESTful 接口
-  - 采用 **BouncyCastle** 引擎实现 `AES-256-GCM` 认证加密
-  - 密钥生成、IV 向量管理以及模拟 L-ABE（属性基加密）的密钥封装
-  - **确保明文数据永远不会传输到服务器端**
+  - 传输层加密（TLS）
 
 ***
 
@@ -37,10 +25,9 @@ QAR 安全系统是一个面向航空领域 QAR（快速访问记录器）数据
 
 ### 安全架构
 
-- **客户端加密**: 明文数据在本地加密服务中处理，服务器仅存储密文
-- **AES-256-GCM 加密**: 采用 BouncyCastle 提供的 AES-256-GCM 算法，确保数据机密性与防篡改
-- **L-ABE 密钥封装**: 模拟属性基加密的密钥管理机制，为后续量子抗性做准备
-- **三权分立**: 用户密码、L-ABE 密钥、服务器密文三方制约，缺一不可
+- **传输层加密**: 使用 Web Crypto API 实现 TLS 传输加密，保护数据传输安全
+- **AES-256-GCM 加密**: 采用 AES-256-GCM 算法进行数据加密，确保数据机密性与防篡改
+- **会话密钥管理**: 每次会话动态生成密钥，确保传输安全
 
 ### 用户管理
 
@@ -57,7 +44,7 @@ QAR 安全系统是一个面向航空领域 QAR（快速访问记录器）数据
 ### 数据持久化
 
 - **数据库**: H2 内存数据库，数据存储在内存中
-- **密文文件**: 上传的 QAR 密文以 `.enc` 物理文件形式存储在 `securitysystem/securitysystem/data/uploads/` 目录
+- **文件存储**: 上传的文件存储在 `securitysystem/securitysystem/data/uploads/` 目录
 
 ***
 
@@ -69,23 +56,7 @@ QAR 安全系统是一个面向航空领域 QAR（快速访问记录器）数据
 - Maven 3.9+
 - 现代浏览器（支持 ES6+）
 
-### 1. 启动本地加密服务
-
-进入 `local-crypto-service` 目录，编译并启动服务：
-
-```bash
-cd local-crypto-service
-.\mvnw clean package -DskipTests
-.\cryptionstart.bat  # Windows 环境下运行
-```
-
-服务将在 `http://127.0.0.1:18234` 启动，可通过 `/health` 接口验证：
-
-```bash
-curl http://127.0.0.1:18234/health
-```
-
-### 2. 启动主业务系统
+### 启动主业务系统
 
 进入 `securitysystem/securitysystem` 目录，启动 Spring Boot 应用：
 
@@ -96,7 +67,7 @@ cd securitysystem/securitysystem
 
 主系统将在 `http://localhost:8101` 启动。
 
-### 3. 访问系统
+### 访问系统
 
 - **入口**: 打开浏览器访问 http://localhost:8101/auth.html
 - **初始管理员账号**: `admin`
@@ -125,16 +96,14 @@ cd securitysystem/securitysystem
 
 1. 登录系统后进入工作台
 2. 选择要上传的文件
-3. 前端自动调用本地加密服务进行加密
-4. 加密完成后，密文上传至服务器
-5. 服务器仅存储密文，无法获取明文
+3. 前端自动进行传输加密
+4. 加密完成后上传至服务器
 
 ### 文件下载流程
 
 1. 在工作台选择要下载的文件
-2. 服务器返回密文数据
-3. 前端调用本地加密服务进行解密
-4. 解密后用户获得原始明文文件
+2. 服务器返回加密数据
+3. 前端自动解密后用户获得原始文件
 
 ***
 
@@ -153,9 +122,10 @@ cd securitysystem/securitysystem
 
 | 接口 | 方法 | 说明 |
 |------|------|------|
-| `/api/files/upload` | POST | 上传加密文件 |
-| `/api/files/download/{id}` | GET | 下载加密文件 |
+| `/api/files/upload` | POST | 上传文件 |
+| `/api/files/download/{id}` | GET | 下载文件 |
 | `/api/files` | GET | 获取文件列表 |
+| `/api/files/stats` | GET | 获取文件统计 |
 
 ### 管理员接口
 
@@ -168,28 +138,12 @@ cd securitysystem/securitysystem
 | `/api/admin/account-requests/{id}/approve` | POST | 批准账号申请 |
 | `/api/admin/account-requests/{id}/reject` | POST | 驳回账号申请 |
 
-### 本地加密服务接口
-
-| 接口 | 方法 | 说明 |
-|------|------|------|
-| `/encrypt` | POST | 加密数据 |
-| `/decrypt` | POST | 解密数据 |
-| `/keys` | GET | 获取密钥状态 |
-| `/health` | GET | 健康检查 |
-
 ***
 
 ## 项目结构
 
 ```
 QAR/
-├── local-crypto-service/          # 本地加密服务
-│   ├── src/main/java/com/qar/crypto/
-│   │   ├── AesCryptoService.java  # AES加密核心实现
-│   │   ├── KeyStore.java          # 密钥存储管理
-│   │   └── LocalCryptoService.java # HTTP服务入口
-│   └── cryptionstart.bat          # Windows启动脚本
-│
 ├── securitysystem/securitysystem/ # 主业务系统
 │   ├── src/main/java/com/qar/securitysystem/
 │   │   ├── config/                # 配置类
@@ -205,7 +159,7 @@ QAR/
 │   │   ├── application.properties # 应用配置
 │   │   └── person_seed.csv        # 人员档案种子数据
 │   └── data/                      # 数据存储目录
-│       └── uploads/               # 加密文件存储
+│       └── uploads/               # 文件存储
 │
 ├── README.md                      # 项目说明文档
 └── wireshark_capture_guide.md     # Wireshark抓包指南
@@ -216,8 +170,8 @@ QAR/
 ## 技术栈
 
 - **后端**: Java 21, Spring Boot 4.x, Spring Security, Spring Data JPA, H2 Database
-- **前端**: HTML5, Vanilla JavaScript, CSS3
-- **加密**: BouncyCastle (bcprov-jdk18on), AES-256-GCM
+- **前端**: HTML5, Vanilla JavaScript, CSS3, Web Crypto API
+- **加密**: AES-256-GCM, RSA-OAEP
 - **构建**: Maven Wrapper
 
 ***
@@ -227,22 +181,22 @@ QAR/
 ### 数据流向
 
 ```
-[用户明文文件] 
-    ↓ (本地加密服务 AES-256-GCM)
-[密文数据] 
+[用户文件] 
+    ↓ (传输层加密 TLS)
+[加密数据] 
     ↓ (HTTPS传输)
-[服务器存储密文]
+[服务器存储]
     ↓ (用户请求下载)
-[密文数据返回]
-    ↓ (本地解密)
-[用户获得明文文件]
+[加密数据返回]
+    ↓ (传输层解密)
+[用户获得原始文件]
 ```
 
 ### 密钥管理
 
-- **AES密钥**: 由本地加密服务生成，存储在用户本地
-- **L-ABE封装**: AES密钥经过模拟L-ABE封装后传输
-- **服务器**: 仅存储密文，无法获取明文或密钥
+- **传输密钥**: 由浏览器 Web Crypto API 生成，会话级别
+- **RSA密钥对**: 用于密钥交换，每次会话重新生成
+- **服务器**: 仅存储数据，无法获取明文
 
 ***
 
@@ -255,20 +209,19 @@ QAR/
   - 配置 `CsrfTokenRequestAttributeHandler` 禁用了 XOR 保护并解决了延迟加载问题，确保管理员能够正常通过/驳回注册申请
   - 统一将安全配置中的 `.hasRole("ADMIN")` 调整为 `.hasAuthority("ROLE_ADMIN")` 以精准匹配权限
 
-- **[Crypto] BouncyCastle 引擎集成**:
-  - 将加解密核心从 JDK 默认 JCE 切换为 BouncyCastle (`bcprov-jdk18on`)
-  - 修复了因为打包成 Fat JAR 导致 BC 签名验证失败（`JCE cannot authenticate the provider BC`）的问题，改用 `maven-dependency-plugin` 独立加载依赖
-  - 废弃硬编码的测试密钥，实现了真正的 AES-256 随机密钥生成与模拟 L-ABE 的动态封装
-
 - **[Encoding] UTF-8 全链路编码**:
   - 解决了中文数据在存储、传输、显示过程中的乱码问题
   - 添加了全局字符编码过滤器，确保所有HTTP请求和响应都使用UTF-8编码
   - 配置了服务器端编码设置，保证JSON响应正确显示中文
 
-- **[Feature] 客户端加密架构**:
-  - 实现了完整的客户端加密流程，明文数据永不上传服务器
-  - 前端自动调用本地加密服务进行加解密操作
-  - 服务器仅存储密文，无法获取明文内容
+- **[Feature] 传输层加密**:
+  - 实现了完整的传输层加密流程
+  - 使用 Web Crypto API 进行 AES-256-GCM 加密
+  - 支持 RSA-OAEP 密钥交换
+
+- **[Feature] 文件统计功能**:
+  - 添加了文件统计接口 `/api/files/stats`
+  - 显示已上传文件和可用数据数量
 
 ***
 
@@ -281,9 +234,9 @@ QAR/
 👉 [Wireshark 抓包指南](./wireshark_capture_guide.md)
 
 **验证要点：**
-- ✓ 主服务器（8101）从未收到明文文件内容
-- ✓ 本地加密服务（18234）处理所有加解密操作
-- ✓ 密文数据正确传输和存储
+- ✓ 传输层加密正常工作
+- ✓ 数据在传输过程中加密
+- ✓ 会话密钥正确管理
 
 ### 测试账号
 

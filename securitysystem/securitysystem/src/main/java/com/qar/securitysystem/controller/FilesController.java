@@ -12,6 +12,7 @@ import com.qar.securitysystem.repo.PersonRecordRepository;
 import com.qar.securitysystem.repo.UserRepository;
 import com.qar.securitysystem.security.AppPrincipal;
 import com.qar.securitysystem.service.FileService;
+import com.qar.securitysystem.startup.PersonSeeder;
 import com.qar.securitysystem.util.SecurityUtil;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -36,12 +37,14 @@ public class FilesController {
     private final UserRepository userRepository;
     private final PersonRecordRepository personRecordRepository;
     private final FileRecordRepository fileRecordRepository;
+    private final PersonSeeder personSeeder;
 
-    public FilesController(FileService fileService, UserRepository userRepository, PersonRecordRepository personRecordRepository, FileRecordRepository fileRecordRepository) {
+    public FilesController(FileService fileService, UserRepository userRepository, PersonRecordRepository personRecordRepository, FileRecordRepository fileRecordRepository, PersonSeeder personSeeder) {
         this.fileService = fileService;
         this.userRepository = userRepository;
         this.personRecordRepository = personRecordRepository;
         this.fileRecordRepository = fileRecordRepository;
+        this.personSeeder = personSeeder;
     }
 
     @Deprecated
@@ -93,7 +96,11 @@ public class FilesController {
         }
 
         if (targetPersonNo != null && !targetPersonNo.isBlank()) {
-            PersonRecordEntity pr = personRecordRepository.findByPersonNo(targetPersonNo.trim()).orElse(null);
+            String normalizedPersonNo = targetPersonNo.trim();
+            PersonRecordEntity pr = personRecordRepository.findByPersonNo(normalizedPersonNo).orElse(null);
+            if (pr == null) {
+                pr = personSeeder.ensurePersonLoaded(normalizedPersonNo).orElse(null);
+            }
             if (pr == null) {
                 return ResponseEntity.badRequest().body(Map.of("code", 400, "message", "profile_not_found"));
             }
@@ -168,11 +175,12 @@ public class FilesController {
         if (!isAdmin && !r.getOwnerId().equals(p.getUserId()) && (p.getPersonId() == null || !r.getOwnerId().equals(p.getPersonId()))) {
             return ResponseEntity.status(403).build();
         }
+        byte[] raw = fileService.decryptForDownload(r);
         PlainFilePayloadResponse resp = new PlainFilePayloadResponse();
-        resp.setDataBase64(r.getEncryptedData());
+        resp.setDataBase64(java.util.Base64.getEncoder().encodeToString(raw));
         resp.setOriginalName(r.getOriginalName() == null ? null : r.getOriginalName().replace("\u0000", "").replace("\r", " ").replace("\n", " ").trim());
         resp.setContentType(r.getContentType());
-        resp.setSizeBytes(r.getSizeBytes());
+        resp.setSizeBytes((long) raw.length);
         return ResponseEntity.ok(resp);
     }
 
